@@ -3,25 +3,31 @@
 * This file is part of HPIPM.                                                                     *
 *                                                                                                 *
 * HPIPM -- High-Performance Interior Point Method.                                                *
-* Copyright (C) 2017-2018 by Gianluca Frison.                                                     *
+* Copyright (C) 2019 by Gianluca Frison.                                                          *
 * Developed at IMTEK (University of Freiburg) under the supervision of Moritz Diehl.              *
 * All rights reserved.                                                                            *
 *                                                                                                 *
-* This program is free software: you can redistribute it and/or modify                            *
-* it under the terms of the GNU General Public License as published by                            *
-* the Free Software Foundation, either version 3 of the License, or                               *
-* (at your option) any later version                                                              *.
+* The 2-Clause BSD License                                                                        *
 *                                                                                                 *
-* This program is distributed in the hope that it will be useful,                                 *
-* but WITHOUT ANY WARRANTY; without even the implied warranty of                                  *
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                                   *
-* GNU General Public License for more details.                                                    *
+* Redistribution and use in source and binary forms, with or without                              *
+* modification, are permitted provided that the following conditions are met:                     *
 *                                                                                                 *
-* You should have received a copy of the GNU General Public License                               *
-* along with this program.  If not, see <https://www.gnu.org/licenses/>.                          *
+* 1. Redistributions of source code must retain the above copyright notice, this                  *
+*    list of conditions and the following disclaimer.                                             *
+* 2. Redistributions in binary form must reproduce the above copyright notice,                    *
+*    this list of conditions and the following disclaimer in the documentation                    *
+*    and/or other materials provided with the distribution.                                       *
 *                                                                                                 *
-* The authors designate this particular file as subject to the "Classpath" exception              *
-* as provided by the authors in the LICENSE file that accompained this code.                      *
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND                 *
+* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED                   *
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE                          *
+* DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR                 *
+* ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES                  *
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;                    *
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND                     *
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT                      *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS                   *
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                                    *
 *                                                                                                 *
 * Author: Gianluca Frison, gianluca.frison (at) imtek.uni-freiburg.de                             *
 *                                                                                                 *
@@ -44,31 +50,34 @@
 
 
 
-#define AXPY_LIBSTR blasfeo_saxpy
-#define COND_QP_OCP2DENSE_ARG s_cond_qp_ocp2dense_arg
-#define COND_QP_OCP2DENSE_WORKSPACE s_cond_qp_ocp2dense_workspace
+#define AXPY blasfeo_saxpy
+#define COND_QP_ARG s_cond_qp_arg
+#define COND_QP_ARG_WS s_cond_qp_ws
 #define DENSE_QP_SOL s_dense_qp_sol
-#define GEAD_LIBSTR blasfeo_sgead
-#define GECP_LIBSTR blasfeo_sgecp
-#define GEEX1_LIBSTR blasfeo_sgeex1
-#define GESE_LIBSTR blasfeo_sgese
-#define GEMM_NN_LIBSTR blasfeo_sgemm_nn
-#define GEMV_T_LIBSTR blasfeo_sgemv_t
-#define GEMV_N_LIBSTR blasfeo_sgemv_n
+#define GEAD blasfeo_sgead
+#define GECP blasfeo_sgecp
+#define GEEX1 blasfeo_sgeex1
+#define GESE blasfeo_sgese
+#define GEMM_NN blasfeo_sgemm_nn
+#define GEMM_NT blasfeo_sgemm_nt
+#define GEMV_T blasfeo_sgemv_t
+#define GEMV_N blasfeo_sgemv_n
 #define OCP_QP s_ocp_qp
 #define OCP_QP_SOL s_ocp_qp_sol
-#define POTRF_L_MN_LIBSTR blasfeo_spotrf_l_mn
+#define POTRF_L_MN blasfeo_spotrf_l_mn
 #define REAL float
-#define ROWAD_LIBSTR blasfeo_srowad
-#define ROWEX_LIBSTR blasfeo_srowex
-#define ROWIN_LIBSTR blasfeo_srowin
+#define ROWAD blasfeo_srowad
+#define ROWEX blasfeo_srowex
+#define ROWIN blasfeo_srowin
 #define STRMAT blasfeo_smat
 #define STRVEC blasfeo_svec
-#define SYMV_L_LIBSTR blasfeo_ssymv_l
-#define SYRK_LN_MN_LIBSTR blasfeo_ssyrk_ln_mn
-#define TRCP_L_LIBSTR blasfeo_strcp_l
-#define TRMM_RLNN_LIBSTR blasfeo_strmm_rlnn
-#define VECCP_LIBSTR blasfeo_sveccp
+#define SYMV_L blasfeo_ssymv_l
+#define SYRK_LN_MN blasfeo_ssyrk_ln_mn
+#define TRCP_L blasfeo_strcp_l
+#define TRTR_L blasfeo_strtr_l
+#define TRMM_RLNN blasfeo_strmm_rlnn
+#define VECAD_SP blasfeo_svecad_sp
+#define VECCP blasfeo_sveccp
 
 #define COND_BABT s_cond_BAbt
 #define COND_B s_cond_b

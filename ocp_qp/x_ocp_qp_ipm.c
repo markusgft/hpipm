@@ -3,25 +3,31 @@
 * This file is part of HPIPM.                                                                     *
 *                                                                                                 *
 * HPIPM -- High-Performance Interior Point Method.                                                *
-* Copyright (C) 2017-2018 by Gianluca Frison.                                                     *
+* Copyright (C) 2019 by Gianluca Frison.                                                          *
 * Developed at IMTEK (University of Freiburg) under the supervision of Moritz Diehl.              *
 * All rights reserved.                                                                            *
 *                                                                                                 *
-* This program is free software: you can redistribute it and/or modify                            *
-* it under the terms of the GNU General Public License as published by                            *
-* the Free Software Foundation, either version 3 of the License, or                               *
-* (at your option) any later version                                                              *.
+* The 2-Clause BSD License                                                                        *
 *                                                                                                 *
-* This program is distributed in the hope that it will be useful,                                 *
-* but WITHOUT ANY WARRANTY; without even the implied warranty of                                  *
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                                   *
-* GNU General Public License for more details.                                                    *
+* Redistribution and use in source and binary forms, with or without                              *
+* modification, are permitted provided that the following conditions are met:                     *
 *                                                                                                 *
-* You should have received a copy of the GNU General Public License                               *
-* along with this program.  If not, see <https://www.gnu.org/licenses/>.                          *
+* 1. Redistributions of source code must retain the above copyright notice, this                  *
+*    list of conditions and the following disclaimer.                                             *
+* 2. Redistributions in binary form must reproduce the above copyright notice,                    *
+*    this list of conditions and the following disclaimer in the documentation                    *
+*    and/or other materials provided with the distribution.                                       *
 *                                                                                                 *
-* The authors designate this particular file as subject to the "Classpath" exception              *
-* as provided by the authors in the LICENSE file that accompained this code.                      *
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND                 *
+* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED                   *
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE                          *
+* DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR                 *
+* ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES                  *
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;                    *
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND                     *
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT                      *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS                   *
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                                    *
 *                                                                                                 *
 * Author: Gianluca Frison, gianluca.frison (at) imtek.uni-freiburg.de                             *
 *                                                                                                 *
@@ -29,14 +35,14 @@
 
 
 
-int SIZEOF_OCP_QP_IPM_ARG()
+int OCP_QP_IPM_ARG_STRSIZE()
 	{
 	return sizeof(struct OCP_QP_IPM_ARG);
 	}
 
 
 
-int MEMSIZE_OCP_QP_IPM_ARG(struct OCP_QP_DIM *dim)
+int OCP_QP_IPM_ARG_MEMSIZE(struct OCP_QP_DIM *dim)
 	{
 
 	return 0;
@@ -45,8 +51,40 @@ int MEMSIZE_OCP_QP_IPM_ARG(struct OCP_QP_DIM *dim)
 
 
 
-void CREATE_OCP_QP_IPM_ARG(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, void *mem)
+void OCP_QP_IPM_ARG_CREATE(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, void *mem)
 	{
+
+#if 0
+	// loop index
+	int ii;
+
+	// zero memory (to avoid corrupted memory like e.g. NaN)
+	int memsize = OCP_QP_IPM_ARG_MEMSIZE(dim);
+	int memsize_m8 = memsize/8; // sizeof(double) is 8
+//	int memsize_r8 = memsize - 8*memsize_m8;
+	double *double_ptr = mem;
+	// XXX exploit that it is multiple of 64 bytes !!!!!
+	for(ii=0; ii<memsize_m8-7; ii+=8)
+		{
+		double_ptr[ii+0] = 0.0;
+		double_ptr[ii+1] = 0.0;
+		double_ptr[ii+2] = 0.0;
+		double_ptr[ii+3] = 0.0;
+		double_ptr[ii+4] = 0.0;
+		double_ptr[ii+5] = 0.0;
+		double_ptr[ii+6] = 0.0;
+		double_ptr[ii+7] = 0.0;
+		}
+//	for(; ii<memsize_m8; ii++)
+//		{
+//		double_ptr[ii] = 0.0;
+//		}
+//	char *char_ptr = (char *) (&double_ptr[ii]);
+//	for(ii=0; ii<memsize_r8; ii++)
+//		{
+//		char_ptr[ii] = 0;
+//		}
+#endif
 
 	arg->memsize = 0;
 
@@ -56,7 +94,7 @@ void CREATE_OCP_QP_IPM_ARG(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, v
 
 
 
-void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_DEFAULT(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg)
 	{
 
 	if(mode==SPEED_ABS)
@@ -74,6 +112,7 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 		arg->itref_pred_max = 0; // not used
 		arg->itref_corr_max = 0; // not used
 		arg->reg_prim = 1e-15;
+		arg->square_root_alg = 1;
 		arg->lq_fact = 0; // not used
 		arg->lam_min = 1e-30;
 		arg->t_min = 1e-30;
@@ -81,6 +120,8 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 		arg->abs_form = 1;
 		arg->comp_dual_sol = 0;
 		arg->comp_res_exit = 0;
+		arg->comp_res_pred = 0;
+		arg->mode = mode;
 		}
 	else if(mode==SPEED)
 		{
@@ -97,6 +138,7 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 		arg->itref_pred_max = 0;
 		arg->itref_corr_max = 0;
 		arg->reg_prim = 1e-15;
+		arg->square_root_alg = 1;
 		arg->lq_fact = 0;
 		arg->lam_min = 1e-30;
 		arg->t_min = 1e-30;
@@ -104,6 +146,8 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 		arg->abs_form = 0;
 		arg->comp_dual_sol = 1;
 		arg->comp_res_exit = 1;
+		arg->comp_res_pred = 1;
+		arg->mode = mode;
 		}
 	else if(mode==BALANCE)
 		{
@@ -120,6 +164,7 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 		arg->itref_pred_max = 0;
 		arg->itref_corr_max = 2;
 		arg->reg_prim = 1e-15;
+		arg->square_root_alg = 1;
 		arg->lq_fact = 1;
 		arg->lam_min = 1e-30;
 		arg->t_min = 1e-30;
@@ -127,6 +172,8 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 		arg->abs_form = 0;
 		arg->comp_dual_sol = 1;
 		arg->comp_res_exit = 1;
+		arg->comp_res_pred = 1;
+		arg->mode = mode;
 		}
 	else if(mode==ROBUST)
 		{
@@ -143,6 +190,7 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 		arg->itref_pred_max = 0;
 		arg->itref_corr_max = 4;
 		arg->reg_prim = 1e-15;
+		arg->square_root_alg = 1;
 		arg->lq_fact = 2;
 		arg->lam_min = 1e-30;
 		arg->t_min = 1e-30;
@@ -150,10 +198,12 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 		arg->abs_form = 0;
 		arg->comp_dual_sol = 1;
 		arg->comp_res_exit = 1;
+		arg->comp_res_pred = 1;
+		arg->mode = mode;
 		}
 	else
 		{
-		printf("\nwrong set default mode\n");
+		printf("\nerror: OCP_QP_IPM_ARG_SET_DEFAULT: wrong set default mode\n");
 		exit(1);
 		}
 
@@ -163,78 +213,170 @@ void SET_DEFAULT_OCP_QP_IPM_ARG(enum HPIPM_MODE mode, struct OCP_QP_IPM_ARG *arg
 
 
 
-void SET_OCP_QP_IPM_ARG_ITER_MAX(int iter_max, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET(char *field, void *value, struct OCP_QP_IPM_ARG *arg)
 	{
-	arg->iter_max = iter_max;
+	if(hpipm_strcmp(field, "iter_max")) 
+		{
+		OCP_QP_IPM_ARG_SET_ITER_MAX(value, arg);
+		}
+	else if(hpipm_strcmp(field, "alpha_min")) 
+		{
+		OCP_QP_IPM_ARG_SET_ALPHA_MIN(value, arg);
+		}
+	else if(hpipm_strcmp(field, "mu0")) 
+		{
+		OCP_QP_IPM_ARG_SET_MU0(value, arg);
+		}
+	else if(hpipm_strcmp(field, "tol_stat")) 
+		{
+		OCP_QP_IPM_ARG_SET_TOL_STAT(value, arg);
+		}
+	else if(hpipm_strcmp(field, "tol_eq")) 
+		{
+		OCP_QP_IPM_ARG_SET_TOL_EQ(value, arg);
+		}
+	else if(hpipm_strcmp(field, "tol_ineq")) 
+		{
+		OCP_QP_IPM_ARG_SET_TOL_INEQ(value, arg);
+		}
+	else if(hpipm_strcmp(field, "tol_comp")) 
+		{
+		OCP_QP_IPM_ARG_SET_TOL_COMP(value, arg);
+		}
+	else if(hpipm_strcmp(field, "reg_prim")) 
+		{
+		OCP_QP_IPM_ARG_SET_REG_PRIM(value, arg);
+		}
+	else if(hpipm_strcmp(field, "warm_start")) 
+		{
+		OCP_QP_IPM_ARG_SET_WARM_START(value, arg);
+		}
+	else if(hpipm_strcmp(field, "pred_corr")) 
+		{
+		OCP_QP_IPM_ARG_SET_PRED_CORR(value, arg);
+		}
+	else if(hpipm_strcmp(field, "ric_alg")) 
+		{
+		OCP_QP_IPM_ARG_SET_RIC_ALG(value, arg);
+		}
+	else if(hpipm_strcmp(field, "comp_res_pred")) 
+		{
+		OCP_QP_IPM_ARG_SET_COMP_RES_PRED(value, arg);
+		}
+	else
+		{
+		printf("error: OCP_QP_IPM_ARG_SET: wrong field %s\n", field);
+		exit(1);	
+		}
 	return;
 	}
 
 
 
-void SET_OCP_QP_IPM_ARG_MU0(REAL mu0, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_ITER_MAX(int *iter_max, struct OCP_QP_IPM_ARG *arg)
 	{
-	arg->mu0 = mu0;
+	arg->iter_max = *iter_max;
 	return;
 	}
 
 
 
-void SET_OCP_QP_IPM_ARG_TOL_STAT(REAL tol_stat, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_ALPHA_MIN(REAL *alpha_min, struct OCP_QP_IPM_ARG *arg)
 	{
-	arg->res_g_max = tol_stat;
+	arg->alpha_min = *alpha_min;
 	return;
 	}
 
 
 
-void SET_OCP_QP_IPM_ARG_TOL_EQ(REAL tol_eq, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_MU0(REAL *mu0, struct OCP_QP_IPM_ARG *arg)
 	{
-	arg->res_b_max = tol_eq;
+	arg->mu0 = *mu0;
 	return;
 	}
 
 
 
-void SET_OCP_QP_IPM_ARG_TOL_INEQ(REAL tol_ineq, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_TOL_STAT(REAL *tol_stat, struct OCP_QP_IPM_ARG *arg)
 	{
-	arg->res_d_max = tol_ineq;
+	arg->res_g_max = *tol_stat;
 	return;
 	}
 
 
 
-void SET_OCP_QP_IPM_ARG_TOL_COMP(REAL tol_comp, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_TOL_EQ(REAL *tol_eq, struct OCP_QP_IPM_ARG *arg)
 	{
-	arg->res_m_max = tol_comp;
+	arg->res_b_max = *tol_eq;
 	return;
 	}
 
 
 
-void SET_OCP_QP_IPM_ARG_REG_PRIM(REAL reg, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_TOL_INEQ(REAL *tol_ineq, struct OCP_QP_IPM_ARG *arg)
 	{
-	arg->reg_prim = reg;
+	arg->res_d_max = *tol_ineq;
 	return;
 	}
 
 
 
-void SET_OCP_QP_IPM_ARG_WARM_START(int warm_start, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_TOL_COMP(REAL *tol_comp, struct OCP_QP_IPM_ARG *arg)
 	{
-	arg->warm_start = warm_start;
+	arg->res_m_max = *tol_comp;
 	return;
 	}
 
 
 
-int SIZEOF_OCP_QP_IPM_WORKSPACE()
+void OCP_QP_IPM_ARG_SET_REG_PRIM(REAL *reg, struct OCP_QP_IPM_ARG *arg)
 	{
-	return sizeof(struct OCP_QP_IPM_WORKSPACE);
+	arg->reg_prim = *reg;
+	return;
 	}
 
 
 
-int MEMSIZE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg)
+void OCP_QP_IPM_ARG_SET_WARM_START(int *warm_start, struct OCP_QP_IPM_ARG *arg)
+	{
+	arg->warm_start = *warm_start;
+	return;
+	}
+
+
+
+void OCP_QP_IPM_ARG_SET_PRED_CORR(int *pred_corr, struct OCP_QP_IPM_ARG *arg)
+	{
+	arg->pred_corr = *pred_corr;
+	return;
+	}
+
+
+
+void OCP_QP_IPM_ARG_SET_RIC_ALG(int *ric_alg, struct OCP_QP_IPM_ARG *arg)
+	{
+	arg->square_root_alg = *ric_alg;
+	return;
+	}
+
+
+
+void OCP_QP_IPM_ARG_SET_COMP_RES_PRED(int *comp_res_pred, struct OCP_QP_IPM_ARG *arg)
+	{
+	arg->comp_res_pred = *comp_res_pred;
+	return;
+	}
+
+
+
+int OCP_QP_IPM_WS_STRSIZE()
+	{
+	return sizeof(struct OCP_QP_IPM_WS);
+	}
+
+
+
+int OCP_QP_IPM_WS_MEMSIZE(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg)
 	{
 
 	// stat_max is at least as big as iter_max
@@ -285,44 +427,65 @@ int MEMSIZE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg)
 	size += 1*sizeof(struct CORE_QP_IPM_WORKSPACE);
 	size += 1*MEMSIZE_CORE_QP_IPM(nvt, net, nct);
 
-	size += 1*sizeof(struct OCP_QP_RES_WORKSPACE); // res_workspace
+	size += 1*sizeof(struct OCP_QP_RES_WS); // res_workspace
 
 	size += 2*sizeof(struct OCP_QP); // qp_step qp_itref
 
 	size += 2*sizeof(struct OCP_QP_SOL); // sol_step sol_itref
-	size += 1*MEMSIZE_OCP_QP_SOL(dim); // sol_itref
+	size += 1*OCP_QP_SOL_MEMSIZE(dim); // sol_itref
 
 	size += 2*sizeof(struct OCP_QP_RES); // res res_itref
-	size += 1*MEMSIZE_OCP_QP_RES(dim); // res_itref
+	size += 1*OCP_QP_RES_MEMSIZE(dim); // res_itref
 
 	size += 9*(N+1)*sizeof(struct STRVEC); // res_g res_d res_m Gamma gamma Zs_inv sol_step(v,lam,t)
 	size += 3*N*sizeof(struct STRVEC); // res_b Pb sol_step(pi) 
 	size += 10*sizeof(struct STRVEC); // tmp_nxM (4+2)*tmp_nbgM (1+1)*tmp_nsM tmp_m
 
 	size += 1*(N+1)*sizeof(struct STRMAT); // L
+	if(!arg->square_root_alg)
+		{
+		size += 1*(N+1)*sizeof(struct STRMAT); // P
+		size += 1*sizeof(struct STRMAT); // Ls
+		}
 	if(arg->lq_fact>0)
+		{
 		size += 1*(N+1)*sizeof(struct STRMAT); // Lh
+		}
 	size += 2*sizeof(struct STRMAT); // AL
 	if(arg->lq_fact>0)
+		{
 		size += 1*sizeof(struct STRMAT); // lq0
+		}
 
 	size += 1*SIZE_STRVEC(nxM); // tmp_nxM
 	size += 4*SIZE_STRVEC(nbM+ngM); // tmp_nbgM
 	size += 1*SIZE_STRVEC(nsM); // tmp_nsM
 	for(ii=0; ii<N; ii++) size += 1*SIZE_STRVEC(nx[ii+1]); // Pb
 	for(ii=0; ii<=N; ii++) size += 1*SIZE_STRVEC(2*ns[ii]); // Zs_inv
-	for(ii=0; ii<=N; ii++) size += 2*SIZE_STRMAT(nu[ii]+nx[ii]+1, nu[ii]+nx[ii]); // L
+
+	for(ii=0; ii<=N; ii++) size += 1*SIZE_STRMAT(nu[ii]+nx[ii]+1, nu[ii]+nx[ii]); // L
+	if(!arg->square_root_alg)
+		{
+		for(ii=0; ii<=N; ii++) size += 1*SIZE_STRMAT(nx[ii]+1, nx[ii]); // P
+		size += 1*SIZE_STRMAT(nxM+1, nuM); // Ls
+		}
 	if(arg->lq_fact>0)
-		for(ii=0; ii<=N; ii++) size += 2*SIZE_STRMAT(nu[ii]+nx[ii]+1, nu[ii]+nx[ii]); // Lh
+		{
+		for(ii=0; ii<=N; ii++) size += 1*SIZE_STRMAT(nu[ii]+nx[ii]+1, nu[ii]+nx[ii]); // Lh
+		}
 	size += 2*SIZE_STRMAT(nuM+nxM+1, nxM+ngM); // AL
 	if(arg->lq_fact>0)
+		{
 		size += 1*SIZE_STRMAT(nuM+nxM, 2*nuM+3*nxM+ngM); // lq0
+		}
 	size += 1*SIZE_STRVEC(nct); // tmp_m
 
 	if(arg->lq_fact>0)
+		{
 		size += 1*GELQF_WORKSIZE(nuM+nxM, 2*nuM+3*nxM+ngM); // lq_work0
+		}
 
-	size += 5*arg->stat_max*sizeof(REAL);
+	size += 9*(1+arg->stat_max)*sizeof(REAL); // stat
 
 	size += (N+1)*sizeof(int); // use_hess_fact
 
@@ -335,11 +498,38 @@ int MEMSIZE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg)
 
 
 
-void CREATE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WORKSPACE *workspace, void *mem)
+void OCP_QP_IPM_WS_CREATE(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *workspace, void *mem)
 	{
 
 	// loop index
 	int ii;
+
+	// zero memory (to avoid corrupted memory like e.g. NaN)
+	int memsize = OCP_QP_IPM_WS_MEMSIZE(dim, arg);
+	int memsize_m8 = memsize/8; // sizeof(double) is 8
+//	int memsize_r8 = memsize - 8*memsize_m8;
+	double *double_ptr = mem;
+	// XXX exploit that it is multiple of 64 bytes !!!!!
+	for(ii=0; ii<memsize_m8-7; ii+=8)
+		{
+		double_ptr[ii+0] = 0.0;
+		double_ptr[ii+1] = 0.0;
+		double_ptr[ii+2] = 0.0;
+		double_ptr[ii+3] = 0.0;
+		double_ptr[ii+4] = 0.0;
+		double_ptr[ii+5] = 0.0;
+		double_ptr[ii+6] = 0.0;
+		double_ptr[ii+7] = 0.0;
+		}
+//	for(; ii<memsize_m8; ii++)
+//		{
+//		double_ptr[ii] = 0.0;
+//		}
+//	char *char_ptr = (char *) (&double_ptr[ii]);
+//	for(ii=0; ii<memsize_r8; ii++)
+//		{
+//		char_ptr[ii] = 0;
+//		}
 
 	// extract ocp qp size
 	int N = dim->N;
@@ -397,7 +587,7 @@ void CREATE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, struc
 
 
 	// res workspace struct
-	struct OCP_QP_RES_WORKSPACE *res_ws_ptr = (struct OCP_QP_RES_WORKSPACE *) res_ptr;
+	struct OCP_QP_RES_WS *res_ws_ptr = (struct OCP_QP_RES_WS *) res_ptr;
 	workspace->res_workspace = res_ws_ptr;
 	res_ws_ptr += 1;
 
@@ -425,6 +615,13 @@ void CREATE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, struc
 
 	workspace->L = sm_ptr;
 	sm_ptr += N+1;
+	if(!arg->square_root_alg)
+		{
+		workspace->P = sm_ptr;
+		sm_ptr += N+1;
+		workspace->Ls = sm_ptr;
+		sm_ptr += 1;
+		}
 	if(arg->lq_fact>0)
 		{
 		workspace->Lh = sm_ptr;
@@ -484,7 +681,7 @@ void CREATE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, struc
 	REAL *d_ptr = (REAL *) sv_ptr;
 
 	workspace->stat = d_ptr;
-	d_ptr += 5*arg->stat_max;
+	d_ptr += 9*(1+arg->stat_max);
 
 	// int stuff
 	int *i_ptr = (int *) d_ptr;
@@ -501,16 +698,26 @@ void CREATE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, struc
 	// void stuf
 	char *c_ptr = (char *) s_ptr;
 
-	CREATE_OCP_QP_SOL(dim, workspace->sol_itref, c_ptr);
+	OCP_QP_SOL_CREATE(dim, workspace->sol_itref, c_ptr);
 	c_ptr += workspace->sol_itref->memsize;
 
-	CREATE_OCP_QP_RES(dim, workspace->res_itref, c_ptr);
+	OCP_QP_RES_CREATE(dim, workspace->res_itref, c_ptr);
 	c_ptr += workspace->res_itref->memsize;
 
 	for(ii=0; ii<=N; ii++)
 		{
 		CREATE_STRMAT(nu[ii]+nx[ii]+1, nu[ii]+nx[ii], workspace->L+ii, c_ptr);
 		c_ptr += (workspace->L+ii)->memsize;
+		}
+	if(!arg->square_root_alg)
+		{
+		for(ii=0; ii<=N; ii++)
+			{
+			CREATE_STRMAT(nx[ii]+1, nx[ii], workspace->P+ii, c_ptr);
+			c_ptr += (workspace->P+ii)->memsize;
+			}
+		CREATE_STRMAT(nxM+1, nuM, workspace->Ls, c_ptr);
+		c_ptr += (workspace->Ls)->memsize;
 		}
 
 	if(arg->lq_fact>0)
@@ -691,12 +898,14 @@ void CREATE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, struc
 
 	workspace->stat_max = arg->stat_max;
 
+	workspace->stat_m = 9;
+
 	for(ii=0; ii<=N; ii++)
 		workspace->use_hess_fact[ii] = 0;
 	
 	workspace->use_Pb = 0;
 
-	workspace->memsize = MEMSIZE_OCP_QP_IPM(dim, arg);
+	workspace->memsize = memsize; //OCP_QP_IPM_WS_MEMSIZE(dim, arg);
 
 
 #if defined(RUNTIME_CHECKS)
@@ -713,138 +922,118 @@ void CREATE_OCP_QP_IPM(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, struc
 	}
 
 
-int GET_OCP_QP_IPM_ITER(struct OCP_QP_IPM_WORKSPACE *ws)
+void OCP_QP_IPM_GET(char *field, struct OCP_QP_IPM_WS *ws, void *value)
 	{
-
-	return ws->iter;
-
+	if(hpipm_strcmp(field, "status"))
+		{ 
+		OCP_QP_IPM_GET_STATUS(ws, value);
+		}
+	else if(hpipm_strcmp(field, "iter"))
+		{ 
+		OCP_QP_IPM_GET_ITER(ws, value);
+		}
+	else if(hpipm_strcmp(field, "max_res_stat"))
+		{ 
+		OCP_QP_IPM_GET_MAX_RES_STAT(ws, value);
+		}
+	else if(hpipm_strcmp(field, "max_res_eq"))
+		{ 
+		OCP_QP_IPM_GET_MAX_RES_EQ(ws, value);
+		}
+	else if(hpipm_strcmp(field, "max_res_ineq"))
+		{ 
+		OCP_QP_IPM_GET_MAX_RES_INEQ(ws, value);
+		}
+	else if(hpipm_strcmp(field, "max_res_comp"))
+		{ 
+		OCP_QP_IPM_GET_MAX_RES_COMP(ws, value);
+		}
+	else if(hpipm_strcmp(field, "stat"))
+		{ 
+		OCP_QP_IPM_GET_STAT(ws, value);
+		}
+	else if(hpipm_strcmp(field, "stat_m"))
+		{ 
+		OCP_QP_IPM_GET_STAT_M(ws, value);
+		}
+	else 
+		{
+		printf("error: OCP_QP_IPM_GET: wrong field %s\n", field);
+		exit(1);
+		}
+	return;
 	}
 
 
 
-REAL GET_OCP_QP_IPM_RES_STAT(struct OCP_QP_IPM_WORKSPACE *ws)
+void OCP_QP_IPM_GET_STATUS(struct OCP_QP_IPM_WS *ws, int *status)
 	{
-
-	return ws->qp_res[0];
-
+	*status = ws->status;
+	return;
 	}
 
 
 
-REAL GET_OCP_QP_IPM_RES_EQ(struct OCP_QP_IPM_WORKSPACE *ws)
+void OCP_QP_IPM_GET_ITER(struct OCP_QP_IPM_WS *ws, int *iter)
 	{
-
-	return ws->qp_res[1];
-
+	*iter = ws->iter;
+	return;
 	}
 
 
 
-REAL GET_OCP_QP_IPM_RES_INEQ(struct OCP_QP_IPM_WORKSPACE *ws)
+void OCP_QP_IPM_GET_MAX_RES_STAT(struct OCP_QP_IPM_WS *ws, REAL *res_stat)
 	{
-
-	return ws->qp_res[2];
-
+	*res_stat = ws->qp_res[0];
+	return;
 	}
 
 
 
-REAL GET_OCP_QP_IPM_RES_COMP(struct OCP_QP_IPM_WORKSPACE *ws)
+void OCP_QP_IPM_GET_MAX_RES_EQ(struct OCP_QP_IPM_WS *ws, REAL *res_eq)
 	{
-
-	return ws->qp_res[3];
-
+	*res_eq = ws->qp_res[1];
+	return;
 	}
 
 
 
-REAL *GET_OCP_QP_IPM_STAT(struct OCP_QP_IPM_WORKSPACE *ws)
+void OCP_QP_IPM_GET_MAX_RES_INEQ(struct OCP_QP_IPM_WS *ws, REAL *res_ineq)
 	{
-
-	return ws->stat;
-
+	*res_ineq = ws->qp_res[2];
+	return;
 	}
 
 
 
-int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WORKSPACE *ws)
+void OCP_QP_IPM_GET_MAX_RES_COMP(struct OCP_QP_IPM_WS *ws, REAL *res_comp)
+	{
+	*res_comp = ws->qp_res[3];
+	return;
+	}
+
+
+
+void OCP_QP_IPM_GET_STAT(struct OCP_QP_IPM_WS *ws, REAL **stat)
+	{
+	*stat = ws->stat;
+	}
+
+
+
+void OCP_QP_IPM_GET_STAT_M(struct OCP_QP_IPM_WS *ws, int *stat_m)
+	{
+	*stat_m = ws->stat_m;
+	}
+
+
+
+void OCP_QP_IPM_SOLVE(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *ws)
 	{
 
 #if 0
-	int N = qp->dim->N;
-	int *nx = qp->dim->nx;
-	int *nu = qp->dim->nu;
-	int *nb = qp->dim->nb;
-	int *ng = qp->dim->ng;
-	int *ns = qp->dim->ns;
-
-	int ii;
-
-#if 1
-	printf("\nnx\n");
-	int_print_mat(1, N+1, nx, 1);
-	printf("\nnu\n");
-	int_print_mat(1, N+1, nu, 1);
-	printf("\nnb\n");
-	int_print_mat(1, N+1, nb, 1);
-	printf("\nng\n");
-	int_print_mat(1, N+1, ng, 1);
-	printf("\nns\n");
-	int_print_mat(1, N+1, ns, 1);
-#endif
-	printf("\nBAt\n");
-	for(ii=0; ii<N; ii++)
-		blasfeo_print_dmat(nu[ii]+nx[ii], nx[ii+1], qp->BAbt+ii, 0, 0);
-	printf("\nb\n");
-	for(ii=0; ii<N; ii++)
-		blasfeo_print_tran_dvec(nx[ii+1], qp->b+ii, 0);
-	printf("\nRSQ\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_dmat(nu[ii]+nx[ii], nu[ii]+nx[ii], qp->RSQrq+ii, 0, 0);
-	printf("\nrq\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(nu[ii]+nx[ii], qp->rqz+ii, 0);
-	printf("\nidxb\n");
-	for(ii=0; ii<=N; ii++)
-		int_print_mat(1, nb[ii], qp->idxb[ii], 1);
-	printf("\nDCt\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_dmat(nu[ii]+nx[ii], ng[ii], qp->DCt+ii, 0, 0);
-	printf("\nd\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(2*nb[ii]+2*ng[ii]+2*ns[ii], qp->d+ii, 0);
-#if 0
-	printf("\nlb\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(nb[ii], qp->d+ii, 0);
-	printf("\nlg\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(ng[ii], qp->d+ii, nb[ii]);
-	printf("\nub\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(nb[ii], qp->d+ii, nb[ii]+ng[ii]);
-	printf("\nug\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(ng[ii], qp->d+ii, 2*nb[ii]+ng[ii]);
-	printf("\nls\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(ns[ii], qp->d+ii, 2*nb[ii]+2*ng[ii]);
-	printf("\nus\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(ns[ii], qp->d+ii, 2*nb[ii]+2*ng[ii]+ns[ii]);
-	printf("\nidxb\n");
-	for(ii=0; ii<=N; ii++)
-		int_print_mat(1, nb[ii], qp->idxb[ii], 1);
-	printf("\nidxs\n");
-	for(ii=0; ii<=N; ii++)
-		int_print_mat(1, ns[ii], qp->idxs[ii], 1);
-	printf("\nZ\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(2*ns[ii], qp->Z+ii, 0);
-	printf("\nrqz\n");
-	for(ii=0; ii<=N; ii++)
-		blasfeo_print_tran_dvec(nu[ii]+nx[ii]+2*ns[ii], qp->rqz+ii, 0);
-#endif
+	OCP_QP_DIM_PRINT(qp->dim);
+	OCP_QP_PRINT(qp->dim, qp);
 #endif
 
 	struct CORE_QP_IPM_WORKSPACE *cws = ws->core_workspace;
@@ -872,7 +1061,7 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 	ws->qp_step->d = ws->res->res_d;
 	ws->qp_step->m = ws->res->res_m;
 
-	// alias members of qp_step
+	// alias members of qp_itref
 	ws->qp_itref->dim = qp->dim;
 	ws->qp_itref->RSQrq = qp->RSQrq;
 	ws->qp_itref->BAbt = qp->BAbt;
@@ -884,18 +1073,6 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 	ws->qp_itref->b = ws->res_itref->res_b;
 	ws->qp_itref->d = ws->res_itref->res_d;
 	ws->qp_itref->m = ws->res_itref->res_m;
-
-	// alias members of qp_itref
-
-	// no constraints
-	if(cws->nc==0)
-		{
-		FACT_SOLVE_KKT_UNCONSTR_OCP_QP(qp, qp_sol, arg, ws);
-		COMPUTE_RES_OCP_QP(qp, qp_sol, ws->res, ws->res_workspace);
-		cws->mu = ws->res->res_mu;
-		ws->iter = 0;
-		return 0;
-		}
 
 	// blasfeo alias for residuals
 	struct STRVEC str_res_g;
@@ -916,6 +1093,26 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 	qp_res[1] = 0;
 	qp_res[2] = 0;
 	qp_res[3] = 0;
+
+	// no constraints
+	if(cws->nc==0)
+		{
+		FACT_SOLVE_KKT_UNCONSTR_OCP_QP(qp, qp_sol, arg, ws);
+		OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
+		// compute infinity norm of residuals
+		VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
+		VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
+		VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
+		VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
+		ws->stat[5] = qp_res[0];
+		ws->stat[6] = qp_res[1];
+		ws->stat[7] = qp_res[2];
+		ws->stat[8] = qp_res[3];
+		cws->mu = ws->res->res_mu;
+		ws->iter = 0;
+		ws->status = 0;
+		return;
+		}
 
 	int N = qp->dim->N;
 	int *nx = qp->dim->nx;
@@ -983,7 +1180,7 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 			// alpha
 			COMPUTE_ALPHA_QP(cws);
 			if(kk<ws->stat_max)
-				ws->stat[5*kk+0] = cws->alpha;
+				ws->stat[ws->stat_m*(kk+1)+0] = cws->alpha;
 
 			// Mehrotra's predictor-corrector
 			if(arg->pred_corr==1)
@@ -991,12 +1188,12 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 				// mu_aff
 				COMPUTE_MU_AFF_QP(cws);
 				if(kk<ws->stat_max)
-					ws->stat[5*kk+1] = cws->mu_aff;
+					ws->stat[ws->stat_m*(kk+1)+1] = cws->mu_aff;
 
 				tmp = cws->mu_aff/cws->mu;
 				cws->sigma = tmp*tmp*tmp;
 				if(kk<ws->stat_max)
-					ws->stat[5*kk+2] = cws->sigma;
+					ws->stat[ws->stat_m*(kk+1)+2] = cws->sigma;
 
 				COMPUTE_CENTERING_CORRECTION_QP(cws);
 
@@ -1013,7 +1210,7 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 				// alpha
 				COMPUTE_ALPHA_QP(cws);
 				if(kk<ws->stat_max)
-					ws->stat[5*kk+3] = cws->alpha;
+					ws->stat[ws->stat_m*(kk+1)+3] = cws->alpha;
 
 				}
 
@@ -1025,7 +1222,7 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 			mu /= cws->nc;
 			cws->mu = mu;
 			if(kk<ws->stat_max)
-				ws->stat[5*kk+4] = mu;
+				ws->stat[ws->stat_m*(kk+1)+4] = mu;
 
 	//		exit(1);
 
@@ -1034,7 +1231,7 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 		if(arg->comp_res_exit & arg->comp_dual_sol)
 			{
 			// compute residuals
-			COMPUTE_RES_OCP_QP(qp, qp_sol, ws->res, ws->res_workspace);
+			OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
 
 			// compute infinity norm of residuals
 			VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
@@ -1045,32 +1242,43 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 
 		ws->iter = kk;
 
-		// max iteration number reached
 		if(kk == arg->iter_max)
-			return 1;
+			{
+			// max iteration number reached
+			ws->status = 1;
+			}
+		else if(cws->alpha <= arg->alpha_min)
+			{
+			// min step lenght
+			ws->status = 2;
+			}
+#ifdef USE_C99_MATH
+		else if(isnan(cws->mu))
+			{
+			// NaN in the solution
+			ws->status = 3;
+			}
+#else
+		else if(cws->mu != cws->mu)
+			{
+			// NaN in the solution
+			ws->status = 3;
+			}
+#endif
+		else
+			{
+			// normal return
+			ws->status = 0;
+			}
 
-		// min step lenght
-		if(cws->alpha <= arg->alpha_min)
-			return 2;
-
-		// NaN in the solution
-	#ifdef USE_C99_MATH
-		if(isnan(cws->mu))
-			return 3;
-	#else
-		if(cws->mu != cws->mu)
-			return 3;
-	#endif
-
-		// normal return
-		return 0;
+		return;
 
 		}
 
 
 
 	// compute residuals
-	COMPUTE_RES_OCP_QP(qp, qp_sol, ws->res, ws->res_workspace);
+	OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
 	BACKUP_RES_M(cws);
 	cws->mu = ws->res->res_mu;
 
@@ -1079,6 +1287,11 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 	VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
 	VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
 	VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
+
+	ws->stat[ws->stat_m*(0)+5] = qp_res[0];
+	ws->stat[ws->stat_m*(0)+6] = qp_res[1];
+	ws->stat[ws->stat_m*(0)+7] = qp_res[2];
+	ws->stat[ws->stat_m*(0)+8] = qp_res[3];
 
 //printf("\niter %d\t%e\t%e\t%e\t%e\n", -1, qp_res[0], qp_res[1], qp_res[2], qp_res[3]);
 
@@ -1090,65 +1303,7 @@ int SOLVE_OCP_QP_IPM(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 
 
 
-#if 0
-	// IPM loop (absolute formulation)
-	for(kk=0; kk<arg->iter_max; kk++)
-		{
-
-		// fact solve
-		FACT_SOLVE_KKT_STEP_OCP_QP(qp, ws->sol_step, arg, ws);
-
-#if 0
-blasfeo_print_tran_dvec(cws->nv, ws->sol_step->ux, 0);
-blasfeo_print_tran_dvec(cws->ne, ws->sol_step->pi, 0);
-blasfeo_print_tran_dvec(cws->nc, ws->sol_step->lam, 0);
-blasfeo_print_tran_dvec(cws->nc, ws->sol_step->t, 0);
-#endif
-
-		// compute step
-		AXPY(cws->nv, -1.0, qp_sol->ux, 0, ws->sol_step->ux, 0, ws->sol_step->ux, 0);
-		AXPY(cws->ne, -1.0, qp_sol->pi, 0, ws->sol_step->pi, 0, ws->sol_step->pi, 0);
-		AXPY(cws->nc, -1.0, qp_sol->lam, 0, ws->sol_step->lam, 0, ws->sol_step->lam, 0);
-		AXPY(cws->nc, -1.0, qp_sol->t, 0, ws->sol_step->t, 0, ws->sol_step->t, 0);
-
-#if 0
-blasfeo_print_tran_dvec(cws->nv, ws->sol_step->ux, 0);
-blasfeo_print_tran_dvec(cws->ne, ws->sol_step->pi, 0);
-blasfeo_print_tran_dvec(cws->nc, ws->sol_step->lam, 0);
-blasfeo_print_tran_dvec(cws->nc, ws->sol_step->t, 0);
-#endif
-
-		// alpha
-		COMPUTE_ALPHA_QP(cws);
-		if(kk<ws->stat_max)
-			ws->stat[5*kk+0] = cws->alpha;
-
-		//
-		UPDATE_VAR_QP(cws);
-
-		// compute residuals
-		COMPUTE_RES_OCP_QP(qp, qp_sol, ws->res, ws->res_workspace);
-		BACKUP_RES_M(cws);
-		cws->mu = ws->res->res_mu;
-		if(kk<ws->stat_max)
-			ws->stat[5*kk+4] = ws->res->res_mu;
-
-		// compute infinity norm of residuals
-		VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
-		VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
-		VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
-		VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
-
-//		exit(1);
-
-		}
-
-	ws->iter = kk;
-
-	return 0;
-#endif
-
-
+	// relative IPM formulation
 
 	// IPM loop
 	for(kk=0; kk<arg->iter_max & \
@@ -1174,7 +1329,7 @@ blasfeo_print_tran_dvec(cws->nc, ws->sol_step->t, 0);
 			FACT_SOLVE_KKT_STEP_OCP_QP(ws->qp_step, ws->sol_step, arg, ws);
 
 			// compute res of linear system
-			COMPUTE_LIN_RES_OCP_QP(ws->qp_step, qp_sol, ws->sol_step, ws->res_itref, ws->res_workspace);
+			OCP_QP_RES_COMPUTE_LIN(ws->qp_step, qp_sol, ws->sol_step, ws->res_itref, ws->res_workspace);
 			VECNRM_INF(cws->nv, ws->res_itref->res_g, 0, &itref_qp_norm[0]);
 			VECNRM_INF(cws->ne, ws->res_itref->res_b, 0, &itref_qp_norm[1]);
 			VECNRM_INF(cws->nc, ws->res_itref->res_d, 0, &itref_qp_norm[2]);
@@ -1229,7 +1384,7 @@ blasfeo_print_tran_dvec(cws->nc, ws->sol_step->t, 0);
 		for(itref0=0; itref0<arg->itref_pred_max; itref0++)
 			{
 
-			COMPUTE_LIN_RES_OCP_QP(ws->qp_step, qp_sol, ws->sol_step, ws->res_itref, ws->res_workspace);
+			OCP_QP_RES_COMPUTE_LIN(ws->qp_step, qp_sol, ws->sol_step, ws->res_itref, ws->res_workspace);
 
 			VECNRM_INF(cws->nv, ws->res_itref->res_g, 0, &itref_qp_norm[0]);
 			VECNRM_INF(cws->ne, ws->res_itref->res_b, 0, &itref_qp_norm[1]);
@@ -1321,7 +1476,7 @@ exit(1);
 		// alpha
 		COMPUTE_ALPHA_QP(cws);
 		if(kk<ws->stat_max)
-			ws->stat[5*kk+0] = cws->alpha;
+			ws->stat[ws->stat_m*(kk+1)+0] = cws->alpha;
 
 		// Mehrotra's predictor-corrector
 		if(arg->pred_corr==1)
@@ -1329,12 +1484,12 @@ exit(1);
 			// mu_aff
 			COMPUTE_MU_AFF_QP(cws);
 			if(kk<ws->stat_max)
-				ws->stat[5*kk+1] = cws->mu_aff;
+				ws->stat[ws->stat_m*(kk+1)+1] = cws->mu_aff;
 
 			tmp = cws->mu_aff/cws->mu;
 			cws->sigma = tmp*tmp*tmp;
 			if(kk<ws->stat_max)
-				ws->stat[5*kk+2] = cws->sigma;
+				ws->stat[ws->stat_m*(kk+1)+2] = cws->sigma;
 
 			COMPUTE_CENTERING_CORRECTION_QP(cws);
 
@@ -1345,7 +1500,7 @@ exit(1);
 			// alpha
 			COMPUTE_ALPHA_QP(cws);
 			if(kk<ws->stat_max)
-				ws->stat[5*kk+3] = cws->alpha;
+				ws->stat[ws->stat_m*(kk+1)+3] = cws->alpha;
 
 			// conditional Mehrotra's predictor-corrector
 			if(arg->cond_pred_corr==1)
@@ -1371,7 +1526,7 @@ exit(1);
 					// alpha
 					COMPUTE_ALPHA_QP(cws);
 					if(kk<ws->stat_max)
-						ws->stat[5*kk+3] = cws->alpha;
+						ws->stat[ws->stat_m*(kk+1)+3] = cws->alpha;
 
 					}
 
@@ -1381,7 +1536,7 @@ exit(1);
 			for(itref1=0; itref1<arg->itref_corr_max; itref1++)
 				{
 
-				COMPUTE_LIN_RES_OCP_QP(ws->qp_step, qp_sol, ws->sol_step, ws->res_itref, ws->res_workspace);
+				OCP_QP_RES_COMPUTE_LIN(ws->qp_step, qp_sol, ws->sol_step, ws->res_itref, ws->res_workspace);
 
 //for(ii=0; ii<=N; ii++)
 //	blasfeo_dvecse(nu[ii]+nx[ii], 0.0, ws->res_itref->res_g+ii, 0);
@@ -1470,7 +1625,7 @@ exit(1);
 				// alpha
 				COMPUTE_ALPHA_QP(cws);
 				if(kk<ws->stat_max)
-					ws->stat[5*kk+3] = cws->alpha;
+					ws->stat[ws->stat_m*(kk+1)+3] = cws->alpha;
 				}
 
 			}
@@ -1479,17 +1634,22 @@ exit(1);
 		UPDATE_VAR_QP(cws);
 
 		// compute residuals
-		COMPUTE_RES_OCP_QP(qp, qp_sol, ws->res, ws->res_workspace);
+		OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
 		BACKUP_RES_M(cws);
 		cws->mu = ws->res->res_mu;
 		if(kk<ws->stat_max)
-			ws->stat[5*kk+4] = ws->res->res_mu;
+			ws->stat[ws->stat_m*(kk+1)+4] = ws->res->res_mu;
 
 		// compute infinity norm of residuals
 		VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
 		VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
 		VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
 		VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
+
+		ws->stat[ws->stat_m*(kk+1)+5] = qp_res[0];
+		ws->stat[ws->stat_m*(kk+1)+6] = qp_res[1];
+		ws->stat[ws->stat_m*(kk+1)+7] = qp_res[2];
+		ws->stat[ws->stat_m*(kk+1)+8] = qp_res[3];
 
 //printf("\niter %d\t%e\t%e\t%e\t%e\n", kk, qp_res[0], qp_res[1], qp_res[2], qp_res[3]);
 
@@ -1503,25 +1663,289 @@ exit(1);
 		blasfeo_print_tran_dvec(nu[ii]+nx[ii], qp_sol->ux+ii, 0);
 #endif
 
-	// max iteration number reached
 	if(kk == arg->iter_max)
-		return 1;
-
-	// min step lenght
-	if(cws->alpha <= arg->alpha_min)
-		return 2;
-
-	// NaN in the solution
+		{
+		// max iteration number reached
+		ws->status = 1;
+		}
+	else if(cws->alpha <= arg->alpha_min)
+		{
+		// min step lenght
+		ws->status = 2;
+		}
 #ifdef USE_C99_MATH
-	if(isnan(cws->mu))
-		return 3;
+	else if(isnan(cws->mu))
+		{
+		// NaN in the solution
+		ws->status = 3;
+		}
 #else
-	if(cws->mu != cws->mu)
-		return 3;
+	else if(cws->mu != cws->mu)
+		{
+		// NaN in the solution
+		ws->status = 3;
+		}
 #endif
+	else
+		{
+		// normal return
+		ws->status = 0;
+		}
 
-	// normal return
-	return 0;
+	return;
 
 	}
 
+
+
+void OCP_QP_IPM_PREDICT(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *ws)
+	{
+
+#if 0
+	OCP_QP_DIM_PRINT(qp->dim);
+	OCP_QP_PRINT(qp->dim, qp);
+#endif
+
+	int ii;
+
+	struct CORE_QP_IPM_WORKSPACE *cws = ws->core_workspace;
+
+	// arg to core workspace
+	cws->lam_min = arg->lam_min;
+	cws->t_min = arg->t_min;
+
+	// alias qp vectors into qp_sol
+	cws->v = qp_sol->ux->pa;
+	cws->pi = qp_sol->pi->pa;
+	cws->lam = qp_sol->lam->pa;
+	cws->t = qp_sol->t->pa;
+
+	// alias members of qp_step
+	ws->qp_step->dim = qp->dim;
+	ws->qp_step->RSQrq = qp->RSQrq;
+	ws->qp_step->BAbt = qp->BAbt;
+	ws->qp_step->DCt = qp->DCt;
+	ws->qp_step->Z = qp->Z;
+	ws->qp_step->idxb = qp->idxb;
+	ws->qp_step->idxs = qp->idxs;
+	ws->qp_step->rqz = ws->res->res_g;
+	ws->qp_step->b = ws->res->res_b;
+	ws->qp_step->d = ws->res->res_d;
+	ws->qp_step->m = ws->res->res_m;
+
+	// TODO ?
+
+	// blasfeo alias for residuals
+	struct STRVEC str_res_g;
+	struct STRVEC str_res_b;
+	struct STRVEC str_res_d;
+	struct STRVEC str_res_m;
+	str_res_g.m = cws->nv;
+	str_res_b.m = cws->ne;
+	str_res_d.m = cws->nc;
+	str_res_m.m = cws->nc;
+	str_res_g.pa = cws->res_g;
+	str_res_b.pa = cws->res_b;
+	str_res_d.pa = cws->res_d;
+	str_res_m.pa = cws->res_m;
+
+	REAL *qp_res = ws->qp_res;
+	qp_res[0] = 0;
+	qp_res[1] = 0;
+	qp_res[2] = 0;
+	qp_res[3] = 0;
+
+#if 0
+// compute residuals
+OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
+
+// compute infinity norm of residuals
+VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
+VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
+VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
+VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
+
+printf("\npredict\t%e\t%e\t%e\t%e\n", qp_res[0], qp_res[1], qp_res[2], qp_res[3]);
+#endif
+
+	// load sol from bkp
+	for(ii=0; ii<cws->nv; ii++)
+		cws->v[ii] = cws->v_bkp[ii];
+	for(ii=0; ii<cws->ne; ii++)
+		cws->pi[ii] = cws->pi_bkp[ii];
+	for(ii=0; ii<cws->nc; ii++)
+		cws->lam[ii] = cws->lam_bkp[ii];
+	for(ii=0; ii<cws->nc; ii++)
+		cws->t[ii] = cws->t_bkp[ii];
+
+	// TODO absolute formulation !!!!!
+
+	// TODO robust formulation !!!!!
+
+	// compute residuals
+	OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
+
+	// compute infinity norm of residuals
+	VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
+	VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
+	VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
+	VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
+
+//printf("\npredict\t%e\t%e\t%e\t%e\n", qp_res[0], qp_res[1], qp_res[2], qp_res[3]);
+
+	// solve kkt
+	ws->use_Pb = 0;
+	SOLVE_KKT_STEP_OCP_QP(ws->qp_step, ws->sol_step, arg, ws);
+
+	// alpha TODO fix alpha=1 !!!!!
+//	COMPUTE_ALPHA_QP(cws);
+	cws->alpha = 1.0;
+
+	//
+	UPDATE_VAR_QP(cws);
+
+	if(arg->comp_res_pred)
+		{
+		// compute residuals in exit
+		OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
+
+		// compute infinity norm of residuals
+		VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
+		VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
+		VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
+		VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
+		}
+
+//printf("\npredict\t%e\t%e\t%e\t%e\n", qp_res[0], qp_res[1], qp_res[2], qp_res[3]);
+
+	// TODO
+
+	// do not change status
+
+	return;
+
+	}
+
+
+
+void OCP_QP_IPM_SENS(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *ws)
+	{
+
+#if 0
+	OCP_QP_DIM_PRINT(qp->dim);
+	OCP_QP_PRINT(qp->dim, qp);
+#endif
+
+	int ii;
+
+	struct CORE_QP_IPM_WORKSPACE *cws = ws->core_workspace;
+
+	// arg to core workspace
+	cws->lam_min = arg->lam_min;
+	cws->t_min = arg->t_min;
+
+	// alias qp vectors into qp_sol
+	cws->v = qp_sol->ux->pa;
+	cws->pi = qp_sol->pi->pa;
+	cws->lam = qp_sol->lam->pa;
+	cws->t = qp_sol->t->pa;
+
+#if 0
+	// alias members of qp_step
+	ws->qp_step->dim = qp->dim;
+	ws->qp_step->RSQrq = qp->RSQrq;
+	ws->qp_step->BAbt = qp->BAbt;
+	ws->qp_step->DCt = qp->DCt;
+	ws->qp_step->Z = qp->Z;
+	ws->qp_step->idxb = qp->idxb;
+	ws->qp_step->idxs = qp->idxs;
+	ws->qp_step->rqz = res->res_g;
+	ws->qp_step->b = res->res_b;
+	ws->qp_step->d = res->res_d;
+	ws->qp_step->m = res->res_m;
+#endif
+
+	// TODO ?
+
+#if 0
+	// blasfeo alias for residuals
+	struct STRVEC str_res_g;
+	struct STRVEC str_res_b;
+	struct STRVEC str_res_d;
+	struct STRVEC str_res_m;
+	str_res_g.m = cws->nv;
+	str_res_b.m = cws->ne;
+	str_res_d.m = cws->nc;
+	str_res_m.m = cws->nc;
+	str_res_g.pa = cws->res_g;
+	str_res_b.pa = cws->res_b;
+	str_res_d.pa = cws->res_d;
+	str_res_m.pa = cws->res_m;
+
+	REAL *qp_res = ws->qp_res;
+	qp_res[0] = 0;
+	qp_res[1] = 0;
+	qp_res[2] = 0;
+	qp_res[3] = 0;
+#endif
+
+#if 0
+// compute residuals
+OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
+
+// compute infinity norm of residuals
+VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
+VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
+VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
+VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
+
+printf("\npredict\t%e\t%e\t%e\t%e\n", qp_res[0], qp_res[1], qp_res[2], qp_res[3]);
+#endif
+
+	// load sol from bkp
+	for(ii=0; ii<cws->nv; ii++)
+		cws->v[ii] = cws->v_bkp[ii];
+	for(ii=0; ii<cws->ne; ii++)
+		cws->pi[ii] = cws->pi_bkp[ii];
+	for(ii=0; ii<cws->nc; ii++)
+		cws->lam[ii] = cws->lam_bkp[ii];
+	for(ii=0; ii<cws->nc; ii++)
+		cws->t[ii] = cws->t_bkp[ii];
+
+//printf("\npredict\t%e\t%e\t%e\t%e\n", qp_res[0], qp_res[1], qp_res[2], qp_res[3]);
+
+	// solve kkt
+	ws->use_Pb = 0;
+//	SOLVE_KKT_STEP_OCP_QP(ws->qp_step, ws->sol_step, arg, ws);
+	SOLVE_KKT_STEP_OCP_QP(qp, qp_sol, arg, ws);
+
+#if 0
+	// alpha TODO fix alpha=1 !!!!!
+//	COMPUTE_ALPHA_QP(cws);
+	cws->alpha = 1.0;
+
+	//
+	UPDATE_VAR_QP(cws);
+
+	if(arg->comp_res_pred)
+		{
+		// compute residuals in exit
+		OCP_QP_RES_COMPUTE(qp, qp_sol, ws->res, ws->res_workspace);
+
+		// compute infinity norm of residuals
+		VECNRM_INF(cws->nv, &str_res_g, 0, &qp_res[0]);
+		VECNRM_INF(cws->ne, &str_res_b, 0, &qp_res[1]);
+		VECNRM_INF(cws->nc, &str_res_d, 0, &qp_res[2]);
+		VECNRM_INF(cws->nc, &str_res_m, 0, &qp_res[3]);
+		}
+#endif
+
+//printf("\npredict\t%e\t%e\t%e\t%e\n", qp_res[0], qp_res[1], qp_res[2], qp_res[3]);
+
+	// TODO
+
+	// do not change status
+
+	return;
+
+	}

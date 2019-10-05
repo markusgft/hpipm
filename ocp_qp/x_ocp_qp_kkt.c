@@ -3,25 +3,31 @@
 * This file is part of HPIPM.                                                                     *
 *                                                                                                 *
 * HPIPM -- High-Performance Interior Point Method.                                                *
-* Copyright (C) 2017-2018 by Gianluca Frison.                                                     *
+* Copyright (C) 2019 by Gianluca Frison.                                                          *
 * Developed at IMTEK (University of Freiburg) under the supervision of Moritz Diehl.              *
 * All rights reserved.                                                                            *
 *                                                                                                 *
-* This program is free software: you can redistribute it and/or modify                            *
-* it under the terms of the GNU General Public License as published by                            *
-* the Free Software Foundation, either version 3 of the License, or                               *
-* (at your option) any later version                                                              *.
+* The 2-Clause BSD License                                                                        *
 *                                                                                                 *
-* This program is distributed in the hope that it will be useful,                                 *
-* but WITHOUT ANY WARRANTY; without even the implied warranty of                                  *
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                                   *
-* GNU General Public License for more details.                                                    *
+* Redistribution and use in source and binary forms, with or without                              *
+* modification, are permitted provided that the following conditions are met:                     *
 *                                                                                                 *
-* You should have received a copy of the GNU General Public License                               *
-* along with this program.  If not, see <https://www.gnu.org/licenses/>.                          *
+* 1. Redistributions of source code must retain the above copyright notice, this                  *
+*    list of conditions and the following disclaimer.                                             *
+* 2. Redistributions in binary form must reproduce the above copyright notice,                    *
+*    this list of conditions and the following disclaimer in the documentation                    *
+*    and/or other materials provided with the distribution.                                       *
 *                                                                                                 *
-* The authors designate this particular file as subject to the "Classpath" exception              *
-* as provided by the authors in the LICENSE file that accompained this code.                      *
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND                 *
+* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED                   *
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE                          *
+* DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR                 *
+* ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES                  *
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;                    *
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND                     *
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT                      *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS                   *
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                                    *
 *                                                                                                 *
 * Author: Gianluca Frison, gianluca.frison (at) imtek.uni-freiburg.de                             *
 *                                                                                                 *
@@ -29,7 +35,8 @@
 
 
 
-void INIT_VAR_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WORKSPACE *ws)
+// TODO with warm_start==2 also init dual variables !!!
+void INIT_VAR_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *ws)
 	{
 
 //	struct CORE_QP_IPM_WORKSPACE *cws = ws->core_workspace;
@@ -53,6 +60,33 @@ void INIT_VAR_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 	int idx;
 
 	REAL thr0 = 1e-1;
+
+
+
+	// primal and dual variables
+	if(arg->warm_start==2)
+		{
+
+		thr0 = 1e-1;
+
+		for(ii=0; ii<=N; ii++)
+			{
+			lam_lb = qp_sol->lam[ii].pa+0;
+			t_lb = qp_sol->t[ii].pa+0;
+
+			for(jj=0; jj<2*nb[ii]+2*ng[ii]+2*ns[ii]; jj++)
+				{
+				if(lam_lb[jj]<thr0)
+					lam_lb[jj] = thr0;
+				if(t_lb[jj]<thr0)
+					t_lb[jj] = thr0;
+				}
+			}
+
+		return;
+		}
+
+
 
 	// ux
 	if(arg->warm_start==0)
@@ -349,257 +383,11 @@ void INIT_VAR_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP
 
 
 
-void COMPUTE_RES_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_RES *res, struct OCP_QP_RES_WORKSPACE *ws)
-	{
-
-	// loop index
-	int ii;
-
-	//
-	int N = qp->dim->N;
-	int *nx = qp->dim->nx;
-	int *nu = qp->dim->nu;
-	int *nb = qp->dim->nb;
-	int *ng = qp->dim->ng;
-	int *ns = qp->dim->ns;
-
-	int nct = 0;
-	for(ii=0; ii<=N; ii++)
-		nct += 2*nb[ii]+2*ng[ii]+2*ns[ii];
-
-	REAL nct_inv = 1.0/nct;
-
-	struct STRMAT *BAbt = qp->BAbt;
-	struct STRMAT *RSQrq = qp->RSQrq;
-	struct STRMAT *DCt = qp->DCt;
-	struct STRVEC *b = qp->b;
-	struct STRVEC *rqz = qp->rqz;
-	struct STRVEC *d = qp->d;
-	struct STRVEC *m = qp->m;
-	int **idxb = qp->idxb;
-	struct STRVEC *Z = qp->Z;
-	int **idxs = qp->idxs;
-
-	struct STRVEC *ux = qp_sol->ux;
-	struct STRVEC *pi = qp_sol->pi;
-	struct STRVEC *lam = qp_sol->lam;
-	struct STRVEC *t = qp_sol->t;
-
-	struct STRVEC *res_g = res->res_g;
-	struct STRVEC *res_b = res->res_b;
-	struct STRVEC *res_d = res->res_d;
-	struct STRVEC *res_m = res->res_m;
-
-	struct STRVEC *tmp_nbgM = ws->tmp_nbgM;
-	struct STRVEC *tmp_nsM = ws->tmp_nsM;
-
-	int nx0, nx1, nu0, nu1, nb0, ng0, ns0;
-
-	//
-	REAL mu = 0.0;
-
-	// loop over stages
-	for(ii=0; ii<=N; ii++)
-		{
-
-		nx0 = nx[ii];
-		nu0 = nu[ii];
-		nb0 = nb[ii];
-		ng0 = ng[ii];
-		ns0 = ns[ii];
-
-		SYMV_L(nu0+nx0, nu0+nx0, 1.0, RSQrq+ii, 0, 0, ux+ii, 0, 1.0, rqz+ii, 0, res_g+ii, 0);
-
-		if(ii>0)
-			AXPY(nx0, -1.0, pi+(ii-1), 0, res_g+ii, nu0, res_g+ii, nu0);
-
-		if(nb0+ng0>0)
-			{
-			AXPY(nb0+ng0, -1.0, lam+ii, 0, lam+ii, nb[ii]+ng[ii], tmp_nbgM+0, 0);
-//			AXPY(nb0+ng0,  1.0, d+ii, 0, t+ii, 0, res_d+ii, 0);
-//			AXPY(nb0+ng0,  1.0, d+ii, nb0+ng0, t+ii, nb0+ng0, res_d+ii, nb0+ng0);
-			AXPY(2*nb0+2*ng0,  1.0, d+ii, 0, t+ii, 0, res_d+ii, 0);
-			// box
-			if(nb0>0)
-				{
-				VECAD_SP(nb0, 1.0, tmp_nbgM+0, 0, idxb[ii], res_g+ii, 0);
-				VECEX_SP(nb0, 1.0, idxb[ii], ux+ii, 0, tmp_nbgM+1, 0);
-				}
-			// general
-			if(ng0>0)
-				{
-				GEMV_NT(nu0+nx0, ng0, 1.0, 1.0, DCt+ii, 0, 0, tmp_nbgM+0, nb[ii], ux+ii, 0, 1.0, 0.0, res_g+ii, 0, tmp_nbgM+1, nb0, res_g+ii, 0, tmp_nbgM+1, nb0);
-				}
-
-			AXPY(nb0+ng0, -1.0, tmp_nbgM+1, 0, res_d+ii, 0, res_d+ii, 0);
-			AXPY(nb0+ng0,  1.0, tmp_nbgM+1, 0, res_d+ii, nb0+ng0, res_d+ii, nb0+ng0);
-			}
-		if(ns0>0)
-			{
-			// res_g
-			GEMV_DIAG(2*ns0, 1.0, Z+ii, 0, ux+ii, nu0+nx0, 1.0, rqz+ii, nu0+nx0, res_g+ii, nu0+nx0);
-			AXPY(2*ns0, -1.0, lam+ii, 2*nb0+2*ng0, res_g+ii, nu0+nx0, res_g+ii, nu0+nx0);
-			VECEX_SP(ns0, 1.0, idxs[ii], lam+ii, 0, tmp_nsM, 0);
-			AXPY(ns0, -1.0, tmp_nsM, 0, res_g+ii, nu0+nx0, res_g+ii, nu0+nx0);
-			VECEX_SP(ns0, 1.0, idxs[ii], lam+ii, nb0+ng0, tmp_nsM, 0);
-			AXPY(ns0, -1.0, tmp_nsM, 0, res_g+ii, nu0+nx0+ns0, res_g+ii, nu0+nx0+ns0);
-			// res_d
-			VECAD_SP(ns0, -1.0, ux+ii, nu0+nx0, idxs[ii], res_d+ii, 0);
-			VECAD_SP(ns0, -1.0, ux+ii, nu0+nx0+ns0, idxs[ii], res_d+ii, nb0+ng0);
-			AXPY(2*ns0, -1.0, ux+ii, nu0+nx0, t+ii, 2*nb0+2*ng0, res_d+ii, 2*nb0+2*ng0);
-			AXPY(2*ns0, 1.0, d+ii, 2*nb0+2*ng0, res_d+ii, 2*nb0+2*ng0, res_d+ii, 2*nb0+2*ng0);
-			}
-
-		if(ii<N)
-			{
-
-			nu1 = nu[ii+1];
-			nx1 = nx[ii+1];
-
-			AXPY(nx1, -1.0, ux+(ii+1), nu1, b+ii, 0, res_b+ii, 0);
-
-			GEMV_NT(nu0+nx0, nx1, 1.0, 1.0, BAbt+ii, 0, 0, pi+ii, 0, ux+ii, 0, 1.0, 1.0, res_g+ii, 0, res_b+ii, 0, res_g+ii, 0, res_b+ii, 0);
-
-			}
-
-		mu += VECMULDOT(2*nb0+2*ng0+2*ns0, lam+ii, 0, t+ii, 0, res_m+ii, 0);
-		AXPY(2*nb0+2*ng0+2*ns0, -1.0, m+ii, 0, res_m+ii, 0, res_m+ii, 0);
-
-		}
-
-	res->res_mu = mu*nct_inv;
-
-	return;
-
-	}
-
-
-
-void COMPUTE_LIN_RES_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_SOL *qp_step, struct OCP_QP_RES *res, struct OCP_QP_RES_WORKSPACE *ws)
-	{
-
-	// loop index
-	int ii;
-
-	//
-	int N = qp->dim->N;
-	int *nx = qp->dim->nx;
-	int *nu = qp->dim->nu;
-	int *nb = qp->dim->nb;
-	int *ng = qp->dim->ng;
-	int *ns = qp->dim->ns;
-
-	struct STRMAT *BAbt = qp->BAbt;
-	struct STRMAT *RSQrq = qp->RSQrq;
-	struct STRMAT *DCt = qp->DCt;
-	struct STRVEC *b = qp->b;
-	struct STRVEC *rqz = qp->rqz;
-	struct STRVEC *d = qp->d;
-	struct STRVEC *m = qp->m;
-	int **idxb = qp->idxb;
-	struct STRVEC *Z = qp->Z;
-	int **idxs = qp->idxs;
-
-	struct STRVEC *ux = qp_step->ux;
-	struct STRVEC *pi = qp_step->pi;
-	struct STRVEC *lam = qp_step->lam;
-	struct STRVEC *t = qp_step->t;
-
-	struct STRVEC *Lam = qp_sol->lam;
-	struct STRVEC *T = qp_sol->t;
-
-	struct STRVEC *res_g = res->res_g;
-	struct STRVEC *res_b = res->res_b;
-	struct STRVEC *res_d = res->res_d;
-	struct STRVEC *res_m = res->res_m;
-
-	struct STRVEC *tmp_nbgM = ws->tmp_nbgM;
-	struct STRVEC *tmp_nsM = ws->tmp_nsM;
-
-	int nx0, nx1, nu0, nu1, nb0, ng0, ns0;
-
-	//
-	REAL mu = 0.0;
-
-	// loop over stages
-	for(ii=0; ii<=N; ii++)
-		{
-
-		nx0 = nx[ii];
-		nu0 = nu[ii];
-		nb0 = nb[ii];
-		ng0 = ng[ii];
-		ns0 = ns[ii];
-
-		SYMV_L(nu0+nx0, nu0+nx0, 1.0, RSQrq+ii, 0, 0, ux+ii, 0, 1.0, rqz+ii, 0, res_g+ii, 0);
-
-		if(ii>0)
-			AXPY(nx0, -1.0, pi+(ii-1), 0, res_g+ii, nu0, res_g+ii, nu0);
-
-		if(nb0+ng0>0)
-			{
-			AXPY(nb0+ng0, -1.0, lam+ii, 0, lam+ii, nb[ii]+ng[ii], tmp_nbgM+0, 0);
-//			AXPY(nb0+ng0,  1.0, d+ii, 0, t+ii, 0, res_d+ii, 0);
-//			AXPY(nb0+ng0,  1.0, d+ii, nb0+ng0, t+ii, nb0+ng0, res_d+ii, nb0+ng0);
-			AXPY(2*nb0+2*ng0,  1.0, d+ii, 0, t+ii, 0, res_d+ii, 0);
-			// box
-			if(nb0>0)
-				{
-				VECAD_SP(nb0, 1.0, tmp_nbgM+0, 0, idxb[ii], res_g+ii, 0);
-				VECEX_SP(nb0, 1.0, idxb[ii], ux+ii, 0, tmp_nbgM+1, 0);
-				}
-			// general
-			if(ng0>0)
-				{
-				GEMV_NT(nu0+nx0, ng0, 1.0, 1.0, DCt+ii, 0, 0, tmp_nbgM+0, nb[ii], ux+ii, 0, 1.0, 0.0, res_g+ii, 0, tmp_nbgM+1, nb0, res_g+ii, 0, tmp_nbgM+1, nb0);
-				}
-
-			AXPY(nb0+ng0, -1.0, tmp_nbgM+1, 0, res_d+ii, 0, res_d+ii, 0);
-			AXPY(nb0+ng0,  1.0, tmp_nbgM+1, 0, res_d+ii, nb0+ng0, res_d+ii, nb0+ng0);
-			}
-		if(ns0>0)
-			{
-			// res_g
-			GEMV_DIAG(2*ns0, 1.0, Z+ii, 0, ux+ii, nu0+nx0, 1.0, rqz+ii, nu0+nx0, res_g+ii, nu0+nx0);
-			AXPY(2*ns0, -1.0, lam+ii, 2*nb0+2*ng0, res_g+ii, nu0+nx0, res_g+ii, nu0+nx0);
-			VECEX_SP(ns0, 1.0, idxs[ii], lam+ii, 0, tmp_nsM, 0);
-			AXPY(ns0, -1.0, tmp_nsM, 0, res_g+ii, nu0+nx0, res_g+ii, nu0+nx0);
-			VECEX_SP(ns0, 1.0, idxs[ii], lam+ii, nb0+ng0, tmp_nsM, 0);
-			AXPY(ns0, -1.0, tmp_nsM, 0, res_g+ii, nu0+nx0+ns0, res_g+ii, nu0+nx0+ns0);
-			// res_d
-			VECAD_SP(ns0, -1.0, ux+ii, nu0+nx0, idxs[ii], res_d+ii, 0);
-			VECAD_SP(ns0, -1.0, ux+ii, nu0+nx0+ns0, idxs[ii], res_d+ii, nb0+ng0);
-			AXPY(2*ns0, -1.0, ux+ii, nu0+nx0, t+ii, 2*nb0+2*ng0, res_d+ii, 2*nb0+2*ng0);
-			AXPY(2*ns0, 1.0, d+ii, 2*nb0+2*ng0, res_d+ii, 2*nb0+2*ng0, res_d+ii, 2*nb0+2*ng0);
-			}
-
-		if(ii<N)
-			{
-
-			nu1 = nu[ii+1];
-			nx1 = nx[ii+1];
-
-			AXPY(nx1, -1.0, ux+(ii+1), nu1, b+ii, 0, res_b+ii, 0);
-
-			GEMV_NT(nu0+nx0, nx1, 1.0, 1.0, BAbt+ii, 0, 0, pi+ii, 0, ux+ii, 0, 1.0, 1.0, res_g+ii, 0, res_b+ii, 0, res_g+ii, 0, res_b+ii, 0);
-
-			}
-
-		VECCP(2*nb0+2*ng0+2*ns0, m+ii, 0, res_m+ii, 0);
-		VECMULACC(2*nb0+2*ng0+2*ns0, Lam+ii, 0, t+ii, 0, res_m+ii, 0);
-		VECMULACC(2*nb0+2*ng0+2*ns0, lam+ii, 0, T+ii, 0, res_m+ii, 0);
-
-		}
-
-	return;
-
-	}
-
-
-
 // backward Riccati recursion
-void FACT_SOLVE_KKT_UNCONSTR_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WORKSPACE *ws)
+void FACT_SOLVE_KKT_UNCONSTR_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *ws)
 	{
+
+	int ii;
 
 	int N = qp->dim->N;
 	int *nx = qp->dim->nx;
@@ -617,59 +405,146 @@ void FACT_SOLVE_KKT_UNCONSTR_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol
 
 	struct STRMAT *L = ws->L;
 	struct STRMAT *AL = ws->AL;
+
 	struct STRVEC *tmp_nxM = ws->tmp_nxM;
 
-	//
-	int ii;
-
-	// factorization and backward substitution
-
-	// last stage
-	ROWIN(nu[N]+nx[N], 1.0, rqz+N, 0, RSQrq+N, nu[N]+nx[N], 0);
-	DIARE(nu[N]+nx[N], arg->reg_prim, RSQrq+N, 0, 0);
-	POTRF_L_MN(nu[N]+nx[N]+1, nu[N]+nx[N], RSQrq+N, 0, 0, L+N, 0, 0);
-	DIARE(nu[N]+nx[N], -arg->reg_prim, RSQrq+N, 0, 0);
-
-	// middle stages
-	for(ii=0; ii<N; ii++)
+	if(arg->square_root_alg)
 		{
-		ROWIN(nx[N-ii], 1.0, b+N-ii-1, 0, BAbt+N-ii-1, nu[N-ii-1]+nx[N-ii-1], 0);
-		TRMM_RLNN(nu[N-ii-1]+nx[N-ii-1]+1, nx[N-ii], 1.0, L+(N-ii), nu[N-ii], nu[N-ii], BAbt+(N-ii-1), 0, 0, AL, 0, 0);
-		GEAD(1, nx[N-ii], 1.0, L+(N-ii), nu[N-ii]+nx[N-ii], nu[N-ii], AL, nu[N-ii-1]+nx[N-ii-1], 0);
 
-		ROWIN(nu[N-ii-1]+nx[N-ii-1], 1.0, rqz+N-ii-1, 0, RSQrq+N-ii-1, nu[N-ii-1]+nx[N-ii-1], 0);
-		DIARE(nu[N-ii-1]+nx[N-ii-1], arg->reg_prim, RSQrq+N-ii-1, 0, 0);
-		SYRK_POTRF_LN_MN(nu[N-ii-1]+nx[N-ii-1]+1, nu[N-ii-1]+nx[N-ii-1], nx[N-ii], AL, 0, 0, AL, 0, 0, RSQrq+(N-ii-1), 0, 0, L+(N-ii-1), 0, 0);
-		DIARE(nu[N-ii-1]+nx[N-ii-1], -arg->reg_prim, RSQrq+N-ii-1, 0, 0);
-		}
+		// factorization and backward substitution
 
-	// forward substitution
+		// last stage
+		ROWIN(nu[N]+nx[N], 1.0, rqz+N, 0, RSQrq+N, nu[N]+nx[N], 0);
+		DIARE(nu[N]+nx[N], arg->reg_prim, RSQrq+N, 0, 0);
+		POTRF_L_MN(nu[N]+nx[N]+1, nu[N]+nx[N], RSQrq+N, 0, 0, L+N, 0, 0);
+		DIARE(nu[N]+nx[N], -arg->reg_prim, RSQrq+N, 0, 0);
 
-	// first stage
-	ii = 0;
-	ROWEX(nu[ii]+nx[ii], -1.0, L+(ii), nu[ii]+nx[ii], 0, ux+ii, 0);
-	TRSV_LTN(nu[ii]+nx[ii], L+ii, 0, 0, ux+ii, 0, ux+ii, 0);
-	GEMV_T(nu[ii]+nx[ii], nx[ii+1], 1.0, BAbt+ii, 0, 0, ux+ii, 0, 1.0, b+ii, 0, ux+(ii+1), nu[ii+1]);
-	ROWEX(nx[ii+1], 1.0, L+(ii+1), nu[ii+1]+nx[ii+1], nu[ii+1], tmp_nxM, 0);
-	TRMV_LTN(nx[ii+1], nx[ii+1], L+(ii+1), nu[ii+1], nu[ii+1], ux+(ii+1), nu[ii+1], pi+ii, 0);
-	AXPY(nx[ii+1], 1.0, tmp_nxM, 0, pi+ii, 0, pi+ii, 0);
-	TRMV_LNN(nx[ii+1], nx[ii+1], L+(ii+1), nu[ii+1], nu[ii+1], pi+ii, 0, pi+ii, 0);
+		// middle stages
+		for(ii=0; ii<N; ii++)
+			{
+			ROWIN(nx[N-ii], 1.0, b+N-ii-1, 0, BAbt+N-ii-1, nu[N-ii-1]+nx[N-ii-1], 0);
+			TRMM_RLNN(nu[N-ii-1]+nx[N-ii-1]+1, nx[N-ii], 1.0, L+(N-ii), nu[N-ii], nu[N-ii], BAbt+N-ii-1, 0, 0, AL, 0, 0);
+			GEAD(1, nx[N-ii], 1.0, L+N-ii, nu[N-ii]+nx[N-ii], nu[N-ii], AL, nu[N-ii-1]+nx[N-ii-1], 0);
 
-	// middle stages
-	for(ii=1; ii<N; ii++)
-		{
-		ROWEX(nu[ii], -1.0, L+(ii), nu[ii]+nx[ii], 0, ux+ii, 0);
+			ROWIN(nu[N-ii-1]+nx[N-ii-1], 1.0, rqz+N-ii-1, 0, RSQrq+N-ii-1, nu[N-ii-1]+nx[N-ii-1], 0);
+			DIARE(nu[N-ii-1]+nx[N-ii-1], arg->reg_prim, RSQrq+N-ii-1, 0, 0);
+			SYRK_POTRF_LN_MN(nu[N-ii-1]+nx[N-ii-1]+1, nu[N-ii-1]+nx[N-ii-1], nx[N-ii], AL, 0, 0, AL, 0, 0, RSQrq+(N-ii-1), 0, 0, L+(N-ii-1), 0, 0);
+			DIARE(nu[N-ii-1]+nx[N-ii-1], -arg->reg_prim, RSQrq+N-ii-1, 0, 0);
+			}
+
+		// forward substitution
+
+		// first stage
+		ii = 0;
+		ROWEX(nu[ii]+nx[ii], -1.0, L+ii, nu[ii]+nx[ii], 0, ux+ii, 0);
+		TRSV_LTN(nu[ii]+nx[ii], L+ii, 0, 0, ux+ii, 0, ux+ii, 0);
+		GEMV_T(nu[ii]+nx[ii], nx[ii+1], 1.0, BAbt+ii, 0, 0, ux+ii, 0, 1.0, b+ii, 0, ux+ii+1, nu[ii+1]);
+		if(arg->comp_dual_sol)
+			{
+			ROWEX(nx[ii+1], 1.0, L+ii+1, nu[ii+1]+nx[ii+1], nu[ii+1], tmp_nxM, 0);
+			TRMV_LTN(nx[ii+1], nx[ii+1], L+(ii+1), nu[ii+1], nu[ii+1], ux+(ii+1), nu[ii+1], pi+ii, 0);
+			AXPY(nx[ii+1], 1.0, tmp_nxM, 0, pi+ii, 0, pi+ii, 0);
+			TRMV_LNN(nx[ii+1], nx[ii+1], L+(ii+1), nu[ii+1], nu[ii+1], pi+ii, 0, pi+ii, 0);
+			}
+
+		// middle stages
+		for(ii=1; ii<N; ii++)
+			{
+			ROWEX(nu[ii], -1.0, L+ii, nu[ii]+nx[ii], 0, ux+ii, 0);
+			TRSV_LTN_MN(nu[ii]+nx[ii], nu[ii], L+ii, 0, 0, ux+ii, 0, ux+ii, 0);
+			GEMV_T(nu[ii]+nx[ii], nx[ii+1], 1.0, BAbt+ii, 0, 0, ux+ii, 0, 1.0, b+ii, 0, ux+(ii+1), nu[ii+1]);
+			if(arg->comp_dual_sol)
+				{
+				ROWEX(nx[ii+1], 1.0, L+(ii+1), nu[ii+1]+nx[ii+1], nu[ii+1], tmp_nxM, 0);
+				TRMV_LTN(nx[ii+1], nx[ii+1], L+(ii+1), nu[ii+1], nu[ii+1], ux+(ii+1), nu[ii+1], pi+ii, 0);
+				AXPY(nx[ii+1], 1.0, tmp_nxM, 0, pi+ii, 0, pi+ii, 0);
+				TRMV_LNN(nx[ii+1], nx[ii+1], L+(ii+1), nu[ii+1], nu[ii+1], pi+ii, 0, pi+ii, 0);
+				}
+			}
+		
+		// last stage
+		ii = N;
+		ROWEX(nu[ii], -1.0, L+ii, nu[ii]+nx[ii], 0, ux+ii, 0);
 		TRSV_LTN_MN(nu[ii]+nx[ii], nu[ii], L+ii, 0, 0, ux+ii, 0, ux+ii, 0);
-		GEMV_T(nu[ii]+nx[ii], nx[ii+1], 1.0, BAbt+ii, 0, 0, ux+ii, 0, 1.0, b+ii, 0, ux+(ii+1), nu[ii+1]);
-		ROWEX(nx[ii+1], 1.0, L+(ii+1), nu[ii+1]+nx[ii+1], nu[ii+1], tmp_nxM, 0);
-		TRMV_LTN(nx[ii+1], nx[ii+1], L+(ii+1), nu[ii+1], nu[ii+1], ux+(ii+1), nu[ii+1], pi+ii, 0);
-		AXPY(nx[ii+1], 1.0, tmp_nxM, 0, pi+ii, 0, pi+ii, 0);
-		TRMV_LNN(nx[ii+1], nx[ii+1], L+(ii+1), nu[ii+1], nu[ii+1], pi+ii, 0, pi+ii, 0);
+
 		}
-	
-	ii = N;
-	ROWEX(nu[ii], -1.0, L+(ii), nu[ii]+nx[ii], 0, ux+ii, 0);
-	TRSV_LTN_MN(nu[ii]+nx[ii], nu[ii], L+ii, 0, 0, ux+ii, 0, ux+ii, 0);
+	else
+		{
+
+		struct STRMAT *P = ws->P;
+		struct STRMAT *Ls = ws->Ls;
+
+		// factorization and backward substitution
+
+		// last stage
+		ROWIN(nu[N]+nx[N], 1.0, rqz+N, 0, RSQrq+N, nu[N]+nx[N], 0);
+		DIARE(nu[N], arg->reg_prim, RSQrq+N, 0, 0);
+		POTRF_L_MN(nu[N]+nx[N]+1, nu[N], RSQrq+N, 0, 0, L+N, 0, 0);
+		DIARE(nu[N], -arg->reg_prim, RSQrq+N, 0, 0);
+		GECP(nx[N]+1, nu[N], L+N, nu[N], 0, Ls, 0, 0);
+		SYRK_LN_MN(nx[N]+1, nx[N], nu[N], -1.0, Ls, 0, 0, Ls, 0, 0, 1.0, RSQrq+N, nu[N], nu[N], P+N, 0, 0);
+		TRTR_L(nx[N], P+N, 0, 0, P+N, 0, 0);
+
+		// middle statges
+		for(ii=0; ii<N-1; ii++)
+			{
+			ROWIN(nx[N-ii], 1.0, b+N-ii-1, 0, BAbt+N-ii-1, nu[N-ii-1]+nx[N-ii-1], 0);
+			GEMM_NT(nu[N-ii-1]+nx[N-ii-1]+1, nx[N-ii], nx[N-ii], 1.0, BAbt+N-ii-1, 0, 0, P+N-ii, 0, 0, 0.0, AL, 0, 0, AL, 0, 0); // TODO symm
+			GEAD(1, nx[N-ii], 1.0, P+N-ii, nx[N-ii], 0, AL, nu[N-ii-1]+nx[N-ii-1], 0);
+			ROWIN(nu[N-ii-1]+nx[N-ii-1], 1.0, rqz+N-ii-1, 0, RSQrq+N-ii-1, nu[N-ii-1]+nx[N-ii-1], 0);
+			DIARE(nu[N-ii-1], arg->reg_prim, RSQrq+N-ii-1, 0, 0);
+			SYRK_LN_MN(nu[N-ii-1]+nx[N-ii-1]+1, nu[N-ii-1]+nx[N-ii-1], nx[N-ii], 1.0, AL, 0, 0, BAbt+N-ii-1, 0, 0, 1.0, RSQrq+N-ii-1, 0, 0, L+N-ii-1, 0, 0);
+			DIARE(nu[N-ii-1], -arg->reg_prim, RSQrq+N-ii-1, 0, 0);
+			POTRF_L_MN(nu[N-ii-1]+nx[N-ii-1]+1, nu[N-ii-1], L+N-ii-1, 0, 0, L+N-ii-1, 0, 0);
+			GECP(nx[N-ii-1]+1, nu[N-ii-1], L+N-ii-1, nu[N-ii-1], 0, Ls, 0, 0);
+			SYRK_LN_MN(nx[N-ii-1]+1, nx[N-ii-1], nu[N-ii-1], -1.0, Ls, 0, 0, Ls, 0, 0, 1.0, L+N-ii-1, nu[N-ii-1], nu[N-ii-1], P+N-ii-1, 0, 0);
+			TRTR_L(nx[N-ii-1], P+N-ii-1, 0, 0, P+N-ii-1, 0, 0);
+			}
+
+		// first stage: factorize P in L too
+		if(N>0)
+			{
+			ROWIN(nx[N-ii], 1.0, b+N-ii-1, 0, BAbt+N-ii-1, nu[N-ii-1]+nx[N-ii-1], 0);
+			GEMM_NT(nu[N-ii-1]+nx[N-ii-1]+1, nx[N-ii], nx[N-ii], 1.0, BAbt+N-ii-1, 0, 0, P+N-ii, 0, 0, 0.0, AL, 0, 0, AL, 0, 0); // TODO symm
+			GEAD(1, nx[N-ii], 1.0, P+N-ii, nx[N-ii], 0, AL, nu[N-ii-1]+nx[N-ii-1], 0);
+			ROWIN(nu[N-ii-1]+nx[N-ii-1], 1.0, rqz+N-ii-1, 0, RSQrq+N-ii-1, nu[N-ii-1]+nx[N-ii-1], 0);
+			DIARE(nu[N-ii-1], arg->reg_prim, RSQrq+N-ii-1, 0, 0);
+			SYRK_POTRF_LN_MN(nu[N-ii-1]+nx[N-ii-1]+1, nu[N-ii-1]+nx[N-ii-1], nx[N-ii], AL, 0, 0, BAbt+N-ii-1, 0, 0, RSQrq+N-ii-1, 0, 0, L+N-ii-1, 0, 0);
+			DIARE(nu[N-ii-1], -arg->reg_prim, RSQrq+N-ii-1, 0, 0);
+			}
+
+		// forward substitution
+
+		// first stage
+		ii = 0;
+		ROWEX(nu[ii]+nx[ii], -1.0, L+ii, nu[ii]+nx[ii], 0, ux+ii, 0);
+		TRSV_LTN(nu[ii]+nx[ii], L+ii, 0, 0, ux+ii, 0, ux+ii, 0);
+		GEMV_T(nu[ii]+nx[ii], nx[ii+1], 1.0, BAbt+ii, 0, 0, ux+ii, 0, 1.0, b+ii, 0, ux+ii+1, nu[ii+1]);
+		if(arg->comp_dual_sol)
+			{
+			ROWEX(nx[ii+1], 1.0, P+ii+1, nx[ii+1], 0, tmp_nxM, 0);
+			GEMV_N(nx[ii+1], nx[ii+1], 1.0, P+ii+1, 0, 0, ux+ii+1, nu[ii+1], 1.0, tmp_nxM, 0, pi+ii, 0);
+			}
+
+		// middle stages
+		for(ii=1; ii<N; ii++)
+			{
+			ROWEX(nu[ii], -1.0, L+ii, nu[ii]+nx[ii], 0, ux+ii, 0);
+			TRSV_LTN_MN(nu[ii]+nx[ii], nu[ii], L+ii, 0, 0, ux+ii, 0, ux+ii, 0);
+			GEMV_T(nu[ii]+nx[ii], nx[ii+1], 1.0, BAbt+ii, 0, 0, ux+ii, 0, 1.0, b+ii, 0, ux+(ii+1), nu[ii+1]);
+			if(arg->comp_dual_sol)
+				{
+				ROWEX(nx[ii+1], 1.0, P+ii+1, nx[ii+1], 0, tmp_nxM, 0);
+				GEMV_N(nx[ii+1], nx[ii+1], 1.0, P+ii+1, 0, 0, ux+ii+1, nu[ii+1], 1.0, tmp_nxM, 0, pi+ii, 0);
+				}
+			}
+
+		// last stage
+		ii = N;
+		ROWEX(nu[ii], -1.0, L+ii, nu[ii]+nx[ii], 0, ux+ii, 0);
+		TRSV_LTN_MN(nu[ii]+nx[ii], nu[ii], L+ii, 0, 0, ux+ii, 0, ux+ii, 0);
+
+		}
 
 	return;
 
@@ -677,7 +552,7 @@ void FACT_SOLVE_KKT_UNCONSTR_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol
 
 
 
-static void COND_SLACKS_FACT_SOLVE(int ss, struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_WORKSPACE *ws)
+static void COND_SLACKS_FACT_SOLVE(int ss, struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_WS *ws)
 	{
 
 	int ii, idx;
@@ -746,7 +621,7 @@ static void COND_SLACKS_FACT_SOLVE(int ss, struct OCP_QP *qp, struct OCP_QP_SOL 
 
 
 
-static void COND_SLACKS_SOLVE(int ss, struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_WORKSPACE *ws)
+static void COND_SLACKS_SOLVE(int ss, struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_WS *ws)
 	{
 
 	int ii, idx;
@@ -802,7 +677,7 @@ static void COND_SLACKS_SOLVE(int ss, struct OCP_QP *qp, struct OCP_QP_SOL *qp_s
 
 
 
-static void EXPAND_SLACKS(int ss, struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_WORKSPACE *ws)
+static void EXPAND_SLACKS(int ss, struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_WS *ws)
 	{
 
 	int ii, idx;
@@ -845,7 +720,7 @@ static void EXPAND_SLACKS(int ss, struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, 
 
 
 // backward Riccati recursion
-void FACT_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WORKSPACE *ws)
+void FACT_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *ws)
 	{
 
 	int N = qp->dim->N;
@@ -889,57 +764,17 @@ void FACT_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, st
 
 	COMPUTE_GAMMA_GAMMA_QP(res_d[0].pa, res_m[0].pa, cws);
 
-	// factorization and backward substitution
+	if(arg->square_root_alg)
+		{
 
-	// last stage
-	ss = N;
+		// factorization and backward substitution
+
+		// last stage
+		ss = N;
 #if defined(DOUBLE_PRECISION)
-	TRCP_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0); // TODO blasfeo_dtrcp_l with m and n, for m>=n
+		TRCP_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0); // TODO blasfeo_dtrcp_l with m and n, for m>=n
 #else
-	GECP(nu[ss]+nx[ss], nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0); // TODO blasfeo_dtrcp_l with m and n, for m>=n
-#endif
-	DIARE(nu[ss]+nx[ss], arg->reg_prim, L+ss, 0, 0);
-	ROWIN(nu[ss]+nx[ss], 1.0, res_g+ss, 0, L+ss, nu[ss]+nx[ss], 0);
-
-	if(ns[ss]>0)
-		{
-		COND_SLACKS_FACT_SOLVE(ss, qp, qp_sol, ws);
-		}
-	else if(nb[ss]+ng[ss]>0)
-		{
-		AXPY(nb[ss]+ng[ss],  1.0, Gamma+ss, nb[ss]+ng[ss], Gamma+ss, 0, tmp_nbgM+0, 0);
-		AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
-		}
-	if(nb[ss]>0)
-		{
-		DIAAD_SP(nb[ss], 1.0, tmp_nbgM+0, 0, idxb[ss], L+ss, 0, 0);
-		ROWAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], L+ss, nu[ss]+nx[ss], 0);
-		}
-	if(ng[ss]>0)
-		{
-		GEMM_R_DIAG(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+0, nb[ss], 0.0, AL+0, 0, 0, AL+0, 0, 0);
-		ROWIN(ng[ss], 1.0, tmp_nbgM+1, nb[ss], AL+0, nu[ss]+nx[ss], 0);
-		SYRK_POTRF_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], ng[ss], AL+0, 0, 0, DCt+ss, 0, 0, L+ss, 0, 0, L+ss, 0, 0);
-		}
-	else
-		{
-		POTRF_L_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], L+ss, 0, 0, L+ss, 0, 0);
-		}
-	
-	// middle stages
-	for(nn=0; nn<N; nn++)
-		{
-		ss = N-nn-1;
-		ROWIN(nx[ss+1], 1.0, res_b+ss, 0, BAbt+ss, nu[ss]+nx[ss], 0);
-		TRMM_RLNN(nu[ss]+nx[ss]+1, nx[ss+1], 1.0, L+ss+1, nu[ss+1], nu[ss+1], BAbt+ss, 0, 0, AL, 0, 0);
-		ROWEX(nx[ss+1], 1.0, AL, nu[ss]+nx[ss], 0, tmp_nxM, 0);
-		TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, Pb+ss, 0);
-		GEAD(1, nx[ss+1], 1.0, L+ss+1, nu[ss+1]+nx[ss+1], nu[ss+1], AL, nu[ss]+nx[ss], 0);
-
-#if defined(DOUBLE_PRECISION)
-		TRCP_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0);
-#else
-		GECP(nu[ss]+nx[ss], nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0);
+		GECP(nu[ss]+nx[ss], nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0); // TODO blasfeo_dtrcp_l with m and n, for m>=n
 #endif
 		DIARE(nu[ss]+nx[ss], arg->reg_prim, L+ss, 0, 0);
 		ROWIN(nu[ss]+nx[ss], 1.0, res_g+ss, 0, L+ss, nu[ss]+nx[ss], 0);
@@ -960,40 +795,69 @@ void FACT_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, st
 			}
 		if(ng[ss]>0)
 			{
-			GEMM_R_DIAG(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+0, nb[ss], 0.0, AL+0, 0, nx[ss+1], AL+0, 0, nx[ss+1]);
-			ROWIN(ng[ss], 1.0, tmp_nbgM+1, nb[ss], AL+0, nu[ss]+nx[ss], nx[ss+1]);
-			GECP(nu[ss]+nx[ss], nx[ss+1], AL+0, 0, 0, AL+1, 0, 0);
-			GECP(nu[ss]+nx[ss], ng[ss], DCt+ss, 0, 0, AL+1, 0, nx[ss+1]);
-			SYRK_POTRF_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], nx[ss+1]+ng[ss], AL+0, 0, 0, AL+1, 0, 0, L+ss, 0, 0, L+ss, 0, 0);
+			GEMM_R_DIAG(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+0, nb[ss], 0.0, AL+0, 0, 0, AL+0, 0, 0);
+			ROWIN(ng[ss], 1.0, tmp_nbgM+1, nb[ss], AL+0, nu[ss]+nx[ss], 0);
+			SYRK_POTRF_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], ng[ss], AL+0, 0, 0, DCt+ss, 0, 0, L+ss, 0, 0, L+ss, 0, 0);
 			}
 		else
 			{
-			SYRK_POTRF_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], nx[ss+1], AL, 0, 0, AL, 0, 0, L+ss, 0, 0, L+ss, 0, 0);
+			POTRF_L_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], L+ss, 0, 0, L+ss, 0, 0);
 			}
 
-		}
+		// middle stages
+		for(nn=0; nn<N; nn++)
+			{
+			ss = N-nn-1;
+			ROWIN(nx[ss+1], 1.0, res_b+ss, 0, BAbt+ss, nu[ss]+nx[ss], 0);
+			TRMM_RLNN(nu[ss]+nx[ss]+1, nx[ss+1], 1.0, L+ss+1, nu[ss+1], nu[ss+1], BAbt+ss, 0, 0, AL, 0, 0);
+			ROWEX(nx[ss+1], 1.0, AL, nu[ss]+nx[ss], 0, tmp_nxM, 0);
+			TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, Pb+ss, 0);
+			GEAD(1, nx[ss+1], 1.0, L+ss+1, nu[ss+1]+nx[ss+1], nu[ss+1], AL, nu[ss]+nx[ss], 0);
 
-	// forward substitution
+#if defined(DOUBLE_PRECISION)
+			TRCP_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0);
+#else
+			GECP(nu[ss]+nx[ss], nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0);
+#endif
+			DIARE(nu[ss]+nx[ss], arg->reg_prim, L+ss, 0, 0);
+			ROWIN(nu[ss]+nx[ss], 1.0, res_g+ss, 0, L+ss, nu[ss]+nx[ss], 0);
 
-	// first stage
-	ss = 0;
-	ROWEX(nu[ss]+nx[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
-	TRSV_LTN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
-	GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+ss+1, nu[ss+1]);
-	if(arg->comp_dual_sol)
-		{
-		ROWEX(nx[ss+1], 1.0, L+ss+1, nu[ss+1]+nx[ss+1], nu[ss+1], tmp_nxM, 0);
-		TRMV_LTN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], dux+ss+1, nu[ss+1], dpi+ss, 0);
-		AXPY(nx[ss+1], 1.0, tmp_nxM, 0, dpi+ss, 0, dpi+ss, 0);
-		TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], dpi+ss, 0, dpi+ss, 0);
-		}
+			if(ns[ss]>0)
+				{
+				COND_SLACKS_FACT_SOLVE(ss, qp, qp_sol, ws);
+				}
+			else if(nb[ss]+ng[ss]>0)
+				{
+				AXPY(nb[ss]+ng[ss],  1.0, Gamma+ss, nb[ss]+ng[ss], Gamma+ss, 0, tmp_nbgM+0, 0);
+				AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+				}
+			if(nb[ss]>0)
+				{
+				DIAAD_SP(nb[ss], 1.0, tmp_nbgM+0, 0, idxb[ss], L+ss, 0, 0);
+				ROWAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], L+ss, nu[ss]+nx[ss], 0);
+				}
+			if(ng[ss]>0)
+				{
+				GEMM_R_DIAG(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+0, nb[ss], 0.0, AL+0, 0, nx[ss+1], AL+0, 0, nx[ss+1]);
+				ROWIN(ng[ss], 1.0, tmp_nbgM+1, nb[ss], AL+0, nu[ss]+nx[ss], nx[ss+1]);
+				GECP(nu[ss]+nx[ss], nx[ss+1], AL+0, 0, 0, AL+1, 0, 0);
+				GECP(nu[ss]+nx[ss], ng[ss], DCt+ss, 0, 0, AL+1, 0, nx[ss+1]);
+				SYRK_POTRF_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], nx[ss+1]+ng[ss], AL+0, 0, 0, AL+1, 0, 0, L+ss, 0, 0, L+ss, 0, 0);
+				}
+			else
+				{
+				SYRK_POTRF_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], nx[ss+1], AL, 0, 0, AL, 0, 0, L+ss, 0, 0, L+ss, 0, 0);
+				}
 
-	// middle stages
-	for(ss=1; ss<N; ss++)
-		{
-		ROWEX(nu[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
-		TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
-		GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+(ss+1), nu[ss+1]);
+			}
+
+		// forward substitution
+
+		// first stage
+		ss = 0;
+		ROWEX(nu[ss]+nx[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
+		TRSV_LTN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+		GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+ss+1, nu[ss+1]);
 		if(arg->comp_dual_sol)
 			{
 			ROWEX(nx[ss+1], 1.0, L+ss+1, nu[ss+1]+nx[ss+1], nu[ss+1], tmp_nxM, 0);
@@ -1001,12 +865,185 @@ void FACT_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, st
 			AXPY(nx[ss+1], 1.0, tmp_nxM, 0, dpi+ss, 0, dpi+ss, 0);
 			TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], dpi+ss, 0, dpi+ss, 0);
 			}
+
+		// middle stages
+		for(ss=1; ss<N; ss++)
+			{
+			ROWEX(nu[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
+			TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+			GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+(ss+1), nu[ss+1]);
+			if(arg->comp_dual_sol)
+				{
+				ROWEX(nx[ss+1], 1.0, L+ss+1, nu[ss+1]+nx[ss+1], nu[ss+1], tmp_nxM, 0);
+				TRMV_LTN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], dux+ss+1, nu[ss+1], dpi+ss, 0);
+				AXPY(nx[ss+1], 1.0, tmp_nxM, 0, dpi+ss, 0, dpi+ss, 0);
+				TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], dpi+ss, 0, dpi+ss, 0);
+				}
+			}
+
+		ss = N;
+		ROWEX(nu[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
+		TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+
 		}
+	else // classical algorithm
+		{
 
-	ss = N;
-	ROWEX(nu[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
-	TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+		struct STRMAT *P = ws->P;
+		struct STRMAT *Ls = ws->Ls;
 
+		// factorization and backward substitution
+
+		// last stage
+		ss = N;
+#if defined(DOUBLE_PRECISION)
+		TRCP_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0); // TODO blasfeo_dtrcp_l with m and n, for m>=n
+#else
+		GECP(nu[ss]+nx[ss], nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0); // TODO blasfeo_dtrcp_l with m and n, for m>=n
+#endif
+		DIARE(nu[ss]+nx[ss], arg->reg_prim, L+ss, 0, 0);
+		ROWIN(nu[ss]+nx[ss], 1.0, res_g+ss, 0, L+ss, nu[ss]+nx[ss], 0);
+
+		if(ns[ss]>0)
+			{
+			COND_SLACKS_FACT_SOLVE(ss, qp, qp_sol, ws);
+			}
+		else if(nb[ss]+ng[ss]>0)
+			{
+			AXPY(nb[ss]+ng[ss],  1.0, Gamma+ss, nb[ss]+ng[ss], Gamma+ss, 0, tmp_nbgM+0, 0);
+			AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+			}
+		if(nb[ss]>0)
+			{
+			DIAAD_SP(nb[ss], 1.0, tmp_nbgM+0, 0, idxb[ss], L+ss, 0, 0);
+			ROWAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], L+ss, nu[ss]+nx[ss], 0);
+			}
+		if(ng[ss]>0)
+			{
+			GEMM_R_DIAG(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+0, nb[ss], 0.0, AL+0, 0, 0, AL+0, 0, 0);
+			ROWIN(ng[ss], 1.0, tmp_nbgM+1, nb[ss], AL+0, nu[ss]+nx[ss], 0);
+			SYRK_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], ng[ss], 1.0, AL+0, 0, 0, DCt+ss, 0, 0, 1.0, L+ss, 0, 0, L+ss, 0, 0);
+			}
+		POTRF_L_MN(nu[ss]+nx[ss]+1, nu[ss], L+ss, 0, 0, L+ss, 0, 0);
+		GECP(nx[ss]+1, nu[ss], L+ss, nu[ss], 0, Ls, 0, 0);
+		SYRK_LN_MN(nx[ss]+1, nx[ss], nu[ss], -1.0, Ls, 0, 0, Ls, 0, 0, 1.0, L+ss, nu[ss], nu[ss], P+ss, 0, 0);
+		TRTR_L(nx[ss], P+ss, 0, 0, P+ss, 0, 0);
+		
+		// middle stages
+		for(nn=0; nn<N-1; nn++)
+			{
+			ss = N-nn-1;
+			ROWIN(nx[ss+1], 1.0, res_b+ss, 0, BAbt+ss, nu[ss]+nx[ss], 0);
+			GEMM_NT(nu[ss]+nx[ss]+1, nx[ss+1], nx[ss+1], 1.0, BAbt+ss, 0, 0, P+ss+1, 0, 0, 0.0, AL, 0, 0, AL, 0, 0); // TODO symm
+			ROWEX(nx[ss+1], 1.0, AL, nu[ss]+nx[ss], 0, Pb+ss, 0);
+			GEAD(1, nx[ss+1], 1.0, P+ss+1, nx[ss+1], 0, AL, nu[ss]+nx[ss], 0);
+
+#if defined(DOUBLE_PRECISION)
+			TRCP_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0);
+#else
+			GECP(nu[ss]+nx[ss], nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0);
+#endif
+			DIARE(nu[ss]+nx[ss], arg->reg_prim, L+ss, 0, 0);
+			ROWIN(nu[ss]+nx[ss], 1.0, res_g+ss, 0, L+ss, nu[ss]+nx[ss], 0);
+
+			if(ns[ss]>0)
+				{
+				COND_SLACKS_FACT_SOLVE(ss, qp, qp_sol, ws);
+				}
+			else if(nb[ss]+ng[ss]>0)
+				{
+				AXPY(nb[ss]+ng[ss],  1.0, Gamma+ss, nb[ss]+ng[ss], Gamma+ss, 0, tmp_nbgM+0, 0);
+				AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+				}
+			if(nb[ss]>0)
+				{
+				DIAAD_SP(nb[ss], 1.0, tmp_nbgM+0, 0, idxb[ss], L+ss, 0, 0);
+				ROWAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], L+ss, nu[ss]+nx[ss], 0);
+				}
+			if(ng[ss]>0)
+				{
+				GEMM_R_DIAG(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+0, nb[ss], 0.0, AL+0, 0, nx[ss+1], AL+0, 0, nx[ss+1]);
+				ROWIN(ng[ss], 1.0, tmp_nbgM+1, nb[ss], AL+0, nu[ss]+nx[ss], nx[ss+1]);
+				SYRK_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], ng[ss], 1.0, AL+0, 0, nx[ss+1], DCt+ss, 0, 0, 1.0, L+ss, 0, 0, L+ss, 0, 0);
+				}
+			SYRK_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], nx[ss+1], 1.0, AL, 0, 0, BAbt+ss, 0, 0, 1.0, L+ss, 0, 0, L+ss, 0, 0);
+			POTRF_L_MN(nu[ss]+nx[ss]+1, nu[ss], L+ss, 0, 0, L+ss, 0, 0);
+			GECP(nx[ss]+1, nu[ss], L+ss, nu[ss], 0, Ls, 0, 0);
+			SYRK_LN_MN(nx[ss]+1, nx[ss], nu[ss], -1.0, Ls, 0, 0, Ls, 0, 0, 1.0, L+ss, nu[ss], nu[ss], P+ss, 0, 0);
+			TRTR_L(nx[ss], P+ss, 0, 0, P+ss, 0, 0);
+			}
+
+		// first stage: factorize P in L too
+		if(N>0)
+			{
+			ss = N-nn-1;
+			ROWIN(nx[ss+1], 1.0, res_b+ss, 0, BAbt+ss, nu[ss]+nx[ss], 0);
+			GEMM_NT(nu[ss]+nx[ss]+1, nx[ss+1], nx[ss+1], 1.0, BAbt+ss, 0, 0, P+ss+1, 0, 0, 0.0, AL, 0, 0, AL, 0, 0); // TODO symm
+			ROWEX(nx[ss+1], 1.0, AL, nu[ss]+nx[ss], 0, Pb+ss, 0);
+			GEAD(1, nx[ss+1], 1.0, P+ss+1, nx[ss+1], 0, AL, nu[ss]+nx[ss], 0);
+
+#if defined(DOUBLE_PRECISION)
+			TRCP_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0);
+#else
+			GECP(nu[ss]+nx[ss], nu[ss]+nx[ss], RSQrq+ss, 0, 0, L+ss, 0, 0);
+#endif
+			DIARE(nu[ss]+nx[ss], arg->reg_prim, L+ss, 0, 0);
+			ROWIN(nu[ss]+nx[ss], 1.0, res_g+ss, 0, L+ss, nu[ss]+nx[ss], 0);
+
+			if(ns[ss]>0)
+				{
+				COND_SLACKS_FACT_SOLVE(ss, qp, qp_sol, ws);
+				}
+			else if(nb[ss]+ng[ss]>0)
+				{
+				AXPY(nb[ss]+ng[ss],  1.0, Gamma+ss, nb[ss]+ng[ss], Gamma+ss, 0, tmp_nbgM+0, 0);
+				AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+				}
+			if(nb[ss]>0)
+				{
+				DIAAD_SP(nb[ss], 1.0, tmp_nbgM+0, 0, idxb[ss], L+ss, 0, 0);
+				ROWAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], L+ss, nu[ss]+nx[ss], 0);
+				}
+			if(ng[ss]>0)
+				{
+				GEMM_R_DIAG(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+0, nb[ss], 0.0, AL+0, 0, nx[ss+1], AL+0, 0, nx[ss+1]);
+				ROWIN(ng[ss], 1.0, tmp_nbgM+1, nb[ss], AL+0, nu[ss]+nx[ss], nx[ss+1]);
+				SYRK_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], ng[ss], 1.0, AL+0, 0, nx[ss+1], DCt+ss, 0, 0, 1.0, L+ss, 0, 0, L+ss, 0, 0);
+				}
+			SYRK_POTRF_LN_MN(nu[ss]+nx[ss]+1, nu[ss]+nx[ss], nx[ss+1], AL, 0, 0, BAbt+ss, 0, 0, L+ss, 0, 0, L+ss, 0, 0);
+			}
+
+		// forward substitution
+
+		// first stage
+		ss = 0;
+		ROWEX(nu[ss]+nx[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
+		TRSV_LTN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+		GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+ss+1, nu[ss+1]);
+		if(arg->comp_dual_sol)
+			{
+			ROWEX(nx[ss+1], 1.0, P+ss+1, nx[ss+1], 0, tmp_nxM, 0);
+			GEMV_N(nx[ss+1], nx[ss+1], 1.0, P+ss+1, 0, 0, dux+ss+1, nu[ss+1], 1.0, tmp_nxM, 0, dpi+ss, 0);
+			}
+
+		// middle stages
+		for(ss=1; ss<N; ss++)
+			{
+			ROWEX(nu[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
+			TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+			GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+(ss+1), nu[ss+1]);
+			if(arg->comp_dual_sol)
+				{
+				ROWEX(nx[ss+1], 1.0, P+ss+1, nx[ss+1], 0, tmp_nxM, 0);
+				GEMV_N(nx[ss+1], nx[ss+1], 1.0, P+ss+1, 0, 0, dux+ss+1, nu[ss+1], 1.0, tmp_nxM, 0, dpi+ss, 0);
+				}
+			}
+
+		ss = N;
+		ROWEX(nu[ss], -1.0, L+ss, nu[ss]+nx[ss], 0, dux+ss, 0);
+		TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+
+		}
 
 	for(ss=0; ss<=N; ss++)
 		VECEX_SP(nb[ss], 1.0, idxb[ss], dux+ss, 0, dt+ss, 0);
@@ -1033,9 +1070,16 @@ void FACT_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, st
 
 
 
-void FACT_LQ_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WORKSPACE *ws)
+void FACT_LQ_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *ws)
 	{
 
+	// TODO find something better ???
+	if(!arg->square_root_alg)
+		{
+		FACT_SOLVE_KKT_STEP_OCP_QP(qp, qp_sol, arg, ws);
+		return;
+		}
+	
 	int N = qp->dim->N;
 	int *nx = qp->dim->nx;
 	int *nu = qp->dim->nu;
@@ -1128,7 +1172,7 @@ void FACT_LQ_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol,
 	if(ws->use_hess_fact[ss]==0)
 		{
 		POTRF_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, Lh+ss, 0, 0);
-		ws->use_hess_fact[ss]==1;
+		ws->use_hess_fact[ss]=1;
 		}
 
 	DIARE(nu[ss]+nx[ss], arg->reg_prim, lq0, 0, nu[ss]+nx[ss]);
@@ -1199,7 +1243,7 @@ void FACT_LQ_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol,
 		if(ws->use_hess_fact[ss]==0)
 			{
 			POTRF_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, Lh+ss, 0, 0);
-			ws->use_hess_fact[ss]==1;
+			ws->use_hess_fact[ss]=1;
 			}
 
 		DIARE(nu[ss]+nx[ss], arg->reg_prim, lq0, 0, nu[ss]+nx[ss]);
@@ -1270,7 +1314,7 @@ void FACT_LQ_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol,
 	if(ws->use_hess_fact[ss]==0)
 		{
 		POTRF_L(nu[ss]+nx[ss], RSQrq+ss, 0, 0, Lh+ss, 0, 0);
-		ws->use_hess_fact[ss]==1;
+		ws->use_hess_fact[ss]=1;
 		}
 
 	DIARE(nu[ss]+nx[ss], arg->reg_prim, lq0, 0, nu[ss]+nx[ss]);
@@ -1345,7 +1389,7 @@ void FACT_LQ_SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol,
 
 
 // backward Riccati recursion
-void SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WORKSPACE *ws)
+void SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_QP_IPM_ARG *arg, struct OCP_QP_IPM_WS *ws)
 	{
 
 	int N = qp->dim->N;
@@ -1384,37 +1428,74 @@ void SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct 
 //printf("\nin solve\n");
 	COMPUTE_GAMMA_QP(res_d[0].pa, res_m[0].pa, cws);
 
-	// backward substitution
+	if(arg->square_root_alg)
+		{
 
-	// last stage
-	ss = N;
+		// backward substitution
+
+		// last stage
+		ss = N;
 //blasfeo_print_exp_tran_dvec(2*nb[ss]+2*ng[ss], gamma+ss, 0);
-	VECCP(nu[ss]+nx[ss], res_g+ss, 0, dux+ss, 0);
+		VECCP(nu[ss]+nx[ss], res_g+ss, 0, dux+ss, 0);
 //blasfeo_print_exp_tran_dvec(nu[ss]+nx[ss], dux+ss, 0);
-	if(ns[ss]>0)
-		{
-		COND_SLACKS_SOLVE(ss, qp, qp_sol, ws);
-		}
-	else if(nb[ss]+ng[ss]>0)
-		{
-		AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
-		}
-	if(nb[ss]>0)
-		{
-		VECAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], dux+ss, 0);
-		}
+		if(ns[ss]>0)
+			{
+			COND_SLACKS_SOLVE(ss, qp, qp_sol, ws);
+			}
+		else if(nb[ss]+ng[ss]>0)
+			{
+			AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+			}
+		if(nb[ss]>0)
+			{
+			VECAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], dux+ss, 0);
+			}
 //blasfeo_print_exp_tran_dvec(nu[ss]+nx[ss], dux+ss, 0);
-	if(ng[ss]>0)
-		{
-		GEMV_N(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+1, nb[ss], 1.0, dux+ss, 0, dux+ss, 0);
-		}
+		if(ng[ss]>0)
+			{
+			GEMV_N(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+1, nb[ss], 1.0, dux+ss, 0, dux+ss, 0);
+			}
 //blasfeo_print_exp_tran_dvec(nu[ss]+nx[ss], dux+ss, 0);
-	TRSV_LNN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+		TRSV_LNN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
 //blasfeo_print_exp_tran_dvec(nu[ss]+nx[ss], dux+ss, 0);
 
-	// middle stages
-	for(nn=0; nn<N-1; nn++)
-		{
+		// middle stages
+		for(nn=0; nn<N-1; nn++)
+			{
+			ss = N-nn-1;
+			VECCP(nu[ss]+nx[ss], res_g+ss, 0, dux+ss, 0);
+			if(ns[ss]>0)
+				{
+				COND_SLACKS_SOLVE(ss, qp, qp_sol, ws);
+				}
+			else if(nb[ss]+ng[ss]>0)
+				{
+				AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+				}
+			if(nb[ss]>0)
+				{
+				VECAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], dux+ss, 0);
+				}
+			if(ng[ss]>0)
+				{
+				GEMV_N(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+1, nb[ss], 1.0, dux+ss, 0, dux+ss, 0);
+				}
+			if(ws->use_Pb)
+				{
+				AXPY(nx[ss+1], 1.0, dux+ss+1, nu[ss+1], Pb+ss, 0, tmp_nxM, 0);
+				}
+			else
+				{
+				TRMV_LTN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], res_b+ss, 0, tmp_nxM, 0);
+				TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
+				AXPY(nx[ss+1], 1.0, dux+ss+1, nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
+				}
+			GEMV_N(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, tmp_nxM, 0, 1.0, dux+ss, 0, dux+ss, 0);
+			TRSV_LNN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+			}
+
+		// first stage
+		nn = N-1;
 		ss = N-nn-1;
 		VECCP(nu[ss]+nx[ss], res_g+ss, 0, dux+ss, 0);
 		if(ns[ss]>0)
@@ -1444,85 +1525,183 @@ void SOLVE_KKT_STEP_OCP_QP(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct 
 			AXPY(nx[ss+1], 1.0, dux+ss+1, nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
 			}
 		GEMV_N(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, tmp_nxM, 0, 1.0, dux+ss, 0, dux+ss, 0);
-		TRSV_LNN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
-		}
+		TRSV_LNN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
 
-	// first stage
-	nn = N-1;
-	ss = N-nn-1;
-	VECCP(nu[ss]+nx[ss], res_g+ss, 0, dux+ss, 0);
-	if(ns[ss]>0)
-		{
-		COND_SLACKS_SOLVE(ss, qp, qp_sol, ws);
-		}
-	else if(nb[ss]+ng[ss]>0)
-		{
-		AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
-		}
-	if(nb[ss]>0)
-		{
-		VECAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], dux+ss, 0);
-		}
-	if(ng[ss]>0)
-		{
-		GEMV_N(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+1, nb[ss], 1.0, dux+ss, 0, dux+ss, 0);
-		}
-	if(ws->use_Pb)
-		{
-		AXPY(nx[ss+1], 1.0, dux+ss+1, nu[ss+1], Pb+ss, 0, tmp_nxM, 0);
-		}
-	else
-		{
-		TRMV_LTN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], res_b+ss, 0, tmp_nxM, 0);
-		TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
-		AXPY(nx[ss+1], 1.0, dux+ss+1, nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
-		}
-	GEMV_N(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, tmp_nxM, 0, 1.0, dux+ss, 0, dux+ss, 0);
-	TRSV_LNN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+		// forward substitution
 
-	// forward substitution
-
-	// first stage
-	ss = 0;
-	if(arg->comp_dual_sol)
-		{
-		VECCP(nx[ss+1], dux+ss+1, nu[ss+1], dpi+ss, 0);
-		}
-	VECSC(nu[ss]+nx[ss], -1.0, dux+ss, 0);
-	TRSV_LTN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
-	GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+ss+1, nu[ss+1]);
-	if(arg->comp_dual_sol)
-		{
-		VECCP(nx[ss+1], dux+ss+1, nu[ss+1], tmp_nxM, 0);
-		TRMV_LTN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
-		TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
-		AXPY(nx[ss+1], 1.0, tmp_nxM, 0, dpi+ss, 0, dpi+ss, 0);
-		}
-
-	// middle stages
-	for(ss=1; ss<N; ss++)
-		{
+		// first stage
+		ss = 0;
 		if(arg->comp_dual_sol)
 			{
 			VECCP(nx[ss+1], dux+ss+1, nu[ss+1], dpi+ss, 0);
 			}
-		VECSC(nu[ss], -1.0, dux+ss, 0);
-		TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+		VECSC(nu[ss]+nx[ss], -1.0, dux+ss, 0);
+		TRSV_LTN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
 		GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+ss+1, nu[ss+1]);
 		if(arg->comp_dual_sol)
 			{
-			VECCP(nx[ss+1], dux+ss+1, nu[ss+1], tmp_nxM, 0);
-			TRMV_LTN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
+			TRMV_LTN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], dux+ss+1, nu[ss+1], tmp_nxM, 0);
 			TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
 			AXPY(nx[ss+1], 1.0, tmp_nxM, 0, dpi+ss, 0, dpi+ss, 0);
 			}
+
+		// middle stages
+		for(ss=1; ss<N; ss++)
+			{
+			if(arg->comp_dual_sol)
+				{
+				VECCP(nx[ss+1], dux+ss+1, nu[ss+1], dpi+ss, 0);
+				}
+			VECSC(nu[ss], -1.0, dux+ss, 0);
+			TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+			GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+ss+1, nu[ss+1]);
+			if(arg->comp_dual_sol)
+				{
+				TRMV_LTN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], dux+ss+1, nu[ss+1], tmp_nxM, 0);
+				TRMV_LNN(nx[ss+1], nx[ss+1], L+ss+1, nu[ss+1], nu[ss+1], tmp_nxM, 0, tmp_nxM, 0);
+				AXPY(nx[ss+1], 1.0, tmp_nxM, 0, dpi+ss, 0, dpi+ss, 0);
+				}
+			}
+
+		ss = N;
+		VECSC(nu[ss], -1.0, dux+ss, 0);
+		TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+
 		}
+	else // classical algirthm
+		{
 
-	ss = N;
-	VECSC(nu[ss], -1.0, dux+ss, 0);
-	TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+		struct STRMAT *P = ws->P;
 
+		// backward substitution
 
+		// last stage
+		ss = N;
+//blasfeo_print_exp_tran_dvec(2*nb[ss]+2*ng[ss], gamma+ss, 0);
+		VECCP(nu[ss]+nx[ss], res_g+ss, 0, dux+ss, 0);
+//blasfeo_print_exp_tran_dvec(nu[ss]+nx[ss], dux+ss, 0);
+		if(ns[ss]>0)
+			{
+			COND_SLACKS_SOLVE(ss, qp, qp_sol, ws);
+			}
+		else if(nb[ss]+ng[ss]>0)
+			{
+			AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+			}
+		if(nb[ss]>0)
+			{
+			VECAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], dux+ss, 0);
+			}
+//blasfeo_print_exp_tran_dvec(nu[ss]+nx[ss], dux+ss, 0);
+		if(ng[ss]>0)
+			{
+			GEMV_N(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+1, nb[ss], 1.0, dux+ss, 0, dux+ss, 0);
+			}
+//blasfeo_print_exp_tran_dvec(nu[ss]+nx[ss], dux+ss, 0);
+		TRSV_LNN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+//blasfeo_print_exp_tran_dvec(nu[ss]+nx[ss], dux+ss, 0);
+
+		// middle stages
+		for(nn=0; nn<N-1; nn++)
+			{
+			ss = N-nn-1;
+			VECCP(nu[ss]+nx[ss], res_g+ss, 0, dux+ss, 0);
+			if(ns[ss]>0)
+				{
+				COND_SLACKS_SOLVE(ss, qp, qp_sol, ws);
+				}
+			else if(nb[ss]+ng[ss]>0)
+				{
+				AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+				}
+			if(nb[ss]>0)
+				{
+				VECAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], dux+ss, 0);
+				}
+			if(ng[ss]>0)
+				{
+				GEMV_N(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+1, nb[ss], 1.0, dux+ss, 0, dux+ss, 0);
+				}
+			if(ws->use_Pb)
+				{
+				AXPY(nx[ss+1], 1.0, dux+ss+1, nu[ss+1], Pb+ss, 0, tmp_nxM, 0);
+				}
+			else
+				{
+				GEMV_N(nx[ss+1], nx[ss+1], 1.0, P+ss+1, 0, 0, res_b+ss, 0, 1.0, dux+ss+1, nu[ss+1], tmp_nxM, 0);
+				}
+			GEMV_N(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, tmp_nxM, 0, 1.0, dux+ss, 0, dux+ss, 0);
+			TRSV_LNN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+			}
+
+		// first stage
+		nn = N-1;
+		ss = N-nn-1;
+		VECCP(nu[ss]+nx[ss], res_g+ss, 0, dux+ss, 0);
+		if(ns[ss]>0)
+			{
+			COND_SLACKS_SOLVE(ss, qp, qp_sol, ws);
+			}
+		else if(nb[ss]+ng[ss]>0)
+			{
+			AXPY(nb[ss]+ng[ss], -1.0, gamma+ss, nb[ss]+ng[ss], gamma+ss, 0, tmp_nbgM+1, 0);
+			}
+		if(nb[ss]>0)
+			{
+			VECAD_SP(nb[ss], 1.0, tmp_nbgM+1, 0, idxb[ss], dux+ss, 0);
+			}
+		if(ng[ss]>0)
+			{
+			GEMV_N(nu[ss]+nx[ss], ng[ss], 1.0, DCt+ss, 0, 0, tmp_nbgM+1, nb[ss], 1.0, dux+ss, 0, dux+ss, 0);
+			}
+		if(ws->use_Pb)
+			{
+			AXPY(nx[ss+1], 1.0, dux+ss+1, nu[ss+1], Pb+ss, 0, tmp_nxM, 0);
+			}
+		else
+			{
+			GEMV_N(nx[ss+1], nx[ss+1], 1.0, P+ss+1, 0, 0, res_b+ss, 0, 1.0, dux+ss+1, nu[ss+1], tmp_nxM, 0);
+			}
+		GEMV_N(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, tmp_nxM, 0, 1.0, dux+ss, 0, dux+ss, 0);
+		TRSV_LNN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+
+		// forward substitution
+
+		// first stage
+		ss = 0;
+		if(arg->comp_dual_sol)
+			{
+			VECCP(nx[ss+1], dux+ss+1, nu[ss+1], dpi+ss, 0);
+			}
+		VECSC(nu[ss]+nx[ss], -1.0, dux+ss, 0);
+		TRSV_LTN(nu[ss]+nx[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+		GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+ss+1, nu[ss+1]);
+		if(arg->comp_dual_sol)
+			{
+			GEMV_N(nx[ss+1], nx[ss+1], 1.0, P+ss+1, 0, 0, dux+ss+1, nu[ss+1], 1.0, dpi+ss, 0, dpi+ss, 0);
+			}
+
+		// middle stages
+		for(ss=1; ss<N; ss++)
+			{
+			if(arg->comp_dual_sol)
+				{
+				VECCP(nx[ss+1], dux+ss+1, nu[ss+1], dpi+ss, 0);
+				}
+			VECSC(nu[ss], -1.0, dux+ss, 0);
+			TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+			GEMV_T(nu[ss]+nx[ss], nx[ss+1], 1.0, BAbt+ss, 0, 0, dux+ss, 0, 1.0, res_b+ss, 0, dux+ss+1, nu[ss+1]);
+			if(arg->comp_dual_sol)
+				{
+				GEMV_N(nx[ss+1], nx[ss+1], 1.0, P+ss+1, 0, 0, dux+ss+1, nu[ss+1], 1.0, dpi+ss, 0, dpi+ss, 0);
+				}
+			}
+
+		ss = N;
+		VECSC(nu[ss], -1.0, dux+ss, 0);
+		TRSV_LTN_MN(nu[ss]+nx[ss], nu[ss], L+ss, 0, 0, dux+ss, 0, dux+ss, 0);
+
+		}
 
 	for(ss=0; ss<=N; ss++)
 		VECEX_SP(nb[ss], 1.0, idxb[ss], dux+ss, 0, dt+ss, 0);

@@ -28,38 +28,80 @@
 ###################################################################################################
 
 cmake_minimum_required(VERSION 2.8.11)
-project(hpipm)
+
+project(hpipm C)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-# Target architecture
-set(TARGET GENERIC)
+# Options
 
 # BLAS and LAPACK version (for LA=BLAS in BLASFEO)
-set(REF_BLAS 0)
-#set(REF_BLAS OPENBLAS)
-#set(REF_BLAS NETLIB)
-#set(REF_BLAS MKL)
-#set(REF_BLAS BLIS)
-#set(REF_BLAS ATLAS)
+set(REF_BLAS 0 CACHE STRING "Set CPU architecture target")
+# set(REF_BLAS OPENBLAS CACHE STRING "Set CPU architecture target")
+# set(REF_BLAS NETLIB   CACHE STRING "Set CPU architecture target")
+# set(REF_BLAS MKL      CACHE STRING "Set CPU architecture target")
+# set(REF_BLAS BLIS     CACHE STRING "Set CPU architecture target")
+# set(REF_BLAS ATLAS    CACHE STRING "Set CPU architecture target")
 
-# Options
+# Populate a list of allowable BLAS versions and link it to the option
+set(ALLOWED_REF_BLAS
+		0
+		OPENBLAS
+		NETLIB
+		MKL
+		BLIS
+		ATLAS
+		)
+set_property(CACHE REF_BLAS PROPERTY STRINGS ${ALLOWED_REF_BLAS})
+
 # set(HPIPM_TESTING ON CACHE BOOL "Tests enabled")
 set(HPIPM_TESTING OFF CACHE BOOL "Tests disabled")
 
-# BLASFEO
-if(NOT TARGET blasfeo)
-	# BLASFEO installation directory
-	set(BLASFEO_PATH /opt/blasfeo)
-	add_library(blasfeo STATIC IMPORTED)
-	set_target_properties(blasfeo PROPERTIES IMPORTED_LOCATION ${BLASFEO_PATH}/lib/libblasfeo.a)
-	set(BLASFEO_INCLUDE_DIR ${BLASFEO_PATH}/include)
-else()
-	# TODO: horrible hardcode; needs to go
-	set(BLASFEO_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../blasfeo/include)
+# Target architecture
+set(TARGET AVX CACHE STRING "Set CPU architecture target")
+#set(TARGET GENERIC CACHE STRING "Set CPU architecture target")
+
+# Populate a list of allowable targets and link it to the option
+set(ALLOWED_TARGETS
+		AVX
+		GENERIC
+		)
+set_property(CACHE TARGET PROPERTY STRINGS ${ALLOWED_TARGETS})
+
+# build shared library
+set(BUILD_SHARED_LIBS OFF CACHE STRING "Build shared libraries")
+
+# Pass the allowed items up to the parent scope (if there is one)
+# This is detected by comparing the project name to the one set earlier in this file
+if(NOT ${CMAKE_PROJECT_NAME} STREQUAL hpipm)
+	set(HPIPM_ALLOWED_TARGETS ${ALLOWED_TARGETS} PARENT_SCOPE)
+	set(HPIPM_ALLOWED_REF_BLAS ${ALLOWED_REF_BLAS} PARENT_SCOPE)
 endif()
 
-set(HPIPM_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+# Installation
+set(CMAKE_INSTALL_PREFIX "/opt/hpipm" CACHE STRING "Installation path")
+
+# BLASFEO Option
+if(NOT TARGET blasfeo)
+	set(BLASFEO_PATH "/opt/blasfeo" CACHE STRING "BLASFEO installation path")
+	if(BUILD_SHARED_LIBS MATCHES OFF)
+		set(HPIPM_BLASFEO_LIB "Static" CACHE STRING "BLASFEO library link type")
+	else()
+		set(HPIPM_BLASFEO_LIB "Shared" CACHE STRING "BLASFEO library link type")
+	endif()
+
+	if(HPIPM_BLASFEO_LIB MATCHES "Static")
+		add_library(blasfeo STATIC IMPORTED)
+		set_target_properties(blasfeo PROPERTIES IMPORTED_LOCATION ${BLASFEO_PATH}/lib/libblasfeo.a)
+	elseif(HPIPM_BLASFEO_LIB MATCHES "Shared")
+		add_library(blasfeo SHARED IMPORTED)
+		set_target_properties(blasfeo PROPERTIES IMPORTED_LOCATION ${BLASFEO_PATH}/lib/libblasfeo.so)
+	endif()
+endif()
+
+# Needed to compile examples
+set(BLASFEO_INCLUDE_DIR "${BLASFEO_PATH}/include")
+set(HPIPM_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
 
 # headers installation directory
 set(HPIPM_HEADERS_INSTALLATION_DIRECTORY "include" CACHE STRING "Headers local installation directory")
@@ -72,10 +114,19 @@ set(RUNTIME_CHECKS 0)
 #set(CMAKE_C_FLAGS "")
 #
 ## optimization flags
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2")
-#if(CMAKE_COMPILER_ID MATCHES "GNU" OR CMAKE_COMPILER_ID MATCHES "Clang")
-#	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-#endif()
+# common flags
+if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -fPIC")
+endif()
+# target-specific flags
+if(${TARGET} MATCHES AVX)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DTARGET_AVX")
+	if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m64 -mavx")
+	endif()
+else()
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DTARGET_GENERIC")
+endif()
 
 #
 if(${REF_BLAS} MATCHES 0)
@@ -119,26 +170,51 @@ file(GLOB COND_SRC
 	)
 # dense qp
 file(GLOB DENSE_QP_SRC
+	# double
 	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qp.c
 	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qp_dim.c
 	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qp_sol.c
 	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qp_kkt.c
 	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qp_ipm.c
 	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qp_res.c
+	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qp_utils.c
+	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qcqp_dim.c
+	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qcqp.c
+	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qcqp_sol.c
+	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qcqp_res.c
+	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qcqp_ipm.c
+	${PROJECT_SOURCE_DIR}/dense_qp/d_dense_qcqp_utils.c
+	# single
 	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qp.c
 	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qp_dim.c
 	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qp_sol.c
 	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qp_kkt.c
 	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qp_ipm.c
 	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qp_res.c
+	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qp_utils.c
+	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qcqp_dim.c
+	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qcqp.c
+	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qcqp_sol.c
+	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qcqp_res.c
+	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qcqp_ipm.c
+	${PROJECT_SOURCE_DIR}/dense_qp/s_dense_qcqp_utils.c
 	)
 # core ipm
-file(GLOB IPM_CORE_SRC
-	${PROJECT_SOURCE_DIR}/ipm_core/d_core_qp_ipm_aux.c
-	${PROJECT_SOURCE_DIR}/ipm_core/d_core_qp_ipm.c
-	${PROJECT_SOURCE_DIR}/ipm_core/s_core_qp_ipm_aux.c
-	${PROJECT_SOURCE_DIR}/ipm_core/s_core_qp_ipm.c
-	)
+if(${TARGET} MATCHES AVX)
+	file(GLOB IPM_CORE_SRC
+		${PROJECT_SOURCE_DIR}/ipm_core/d_core_qp_ipm_aux_avx.c
+		${PROJECT_SOURCE_DIR}/ipm_core/d_core_qp_ipm.c
+		${PROJECT_SOURCE_DIR}/ipm_core/s_core_qp_ipm_aux_avx.c
+		${PROJECT_SOURCE_DIR}/ipm_core/s_core_qp_ipm.c
+		)
+else(${TARGET} MATCHES AVX)
+	file(GLOB IPM_CORE_SRC
+		${PROJECT_SOURCE_DIR}/ipm_core/d_core_qp_ipm_aux.c
+		${PROJECT_SOURCE_DIR}/ipm_core/d_core_qp_ipm.c
+		${PROJECT_SOURCE_DIR}/ipm_core/s_core_qp_ipm_aux.c
+		${PROJECT_SOURCE_DIR}/ipm_core/s_core_qp_ipm.c
+		)
+endif(${TARGET} MATCHES AVX)
 # ocp qp
 file(GLOB OCP_QP_SRC
 	${PROJECT_SOURCE_DIR}/ocp_qp/d_ocp_qp.c
@@ -178,6 +254,7 @@ file(GLOB TREE_OCP_QP_SRC
 # auxiliary
 file(GLOB AUXILIARY_SRC
 	${PROJECT_SOURCE_DIR}/auxiliary/aux_string.c
+	${PROJECT_SOURCE_DIR}/auxiliary/timing.c
 	)
 
 set(HPIPM_SRC ${COND_SRC} ${DENSE_QP_SRC} ${IPM_CORE_SRC} ${OCP_QP_SRC} ${TREE_OCP_QP_SRC} ${AUXILIARY_SRC})
@@ -185,8 +262,9 @@ set(HPIPM_SRC ${COND_SRC} ${DENSE_QP_SRC} ${IPM_CORE_SRC} ${OCP_QP_SRC} ${TREE_O
 add_library(hpipm ${HPIPM_SRC})
 target_include_directories(hpipm
 	PUBLIC
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
-		$<INSTALL_INTERFACE:include/hpipm/include>)
+		$<BUILD_INTERFACE:${HPIPM_INCLUDE_DIR}>
+		$<BUILD_INTERFACE:${BLASFEO_INCLUDE_DIR}>
+		$<INSTALL_INTERFACE:${HPIPM_HEADERS_INSTALLATION_DIRECTORY}>)
 target_link_libraries(hpipm blasfeo)
 
 install(TARGETS hpipm EXPORT hpipmConfig
@@ -203,3 +281,5 @@ install(FILES ${HPIPM_HEADERS} DESTINATION ${HPIPM_HEADERS_INSTALLATION_DIRECTOR
 if(HPIPM_TESTING MATCHES ON)
 	add_subdirectory(test_problems)
 endif()
+
+message(STATUS "Using BLASFEO path: ${BLASFEO_PATH}")

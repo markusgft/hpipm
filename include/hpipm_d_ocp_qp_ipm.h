@@ -3,25 +3,31 @@
 * This file is part of HPIPM.                                                                     *
 *                                                                                                 *
 * HPIPM -- High-Performance Interior Point Method.                                                *
-* Copyright (C) 2017-2018 by Gianluca Frison.                                                     *
+* Copyright (C) 2019 by Gianluca Frison.                                                          *
 * Developed at IMTEK (University of Freiburg) under the supervision of Moritz Diehl.              *
 * All rights reserved.                                                                            *
 *                                                                                                 *
-* This program is free software: you can redistribute it and/or modify                            *
-* it under the terms of the GNU General Public License as published by                            *
-* the Free Software Foundation, either version 3 of the License, or                               *
-* (at your option) any later version                                                              *.
+* The 2-Clause BSD License                                                                        *
 *                                                                                                 *
-* This program is distributed in the hope that it will be useful,                                 *
-* but WITHOUT ANY WARRANTY; without even the implied warranty of                                  *
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                                   *
-* GNU General Public License for more details.                                                    *
+* Redistribution and use in source and binary forms, with or without                              *
+* modification, are permitted provided that the following conditions are met:                     *
 *                                                                                                 *
-* You should have received a copy of the GNU General Public License                               *
-* along with this program.  If not, see <https://www.gnu.org/licenses/>.                          *
+* 1. Redistributions of source code must retain the above copyright notice, this                  *
+*    list of conditions and the following disclaimer.                                             *
+* 2. Redistributions in binary form must reproduce the above copyright notice,                    *
+*    this list of conditions and the following disclaimer in the documentation                    *
+*    and/or other materials provided with the distribution.                                       *
 *                                                                                                 *
-* The authors designate this particular file as subject to the "Classpath" exception              *
-* as provided by the authors in the LICENSE file that accompained this code.                      *
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND                 *
+* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED                   *
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE                          *
+* DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR                 *
+* ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES                  *
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;                    *
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND                     *
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT                      *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS                   *
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                                    *
 *                                                                                                 *
 * Author: Gianluca Frison, gianluca.frison (at) imtek.uni-freiburg.de                             *
 *                                                                                                 *
@@ -66,20 +72,24 @@ struct d_ocp_qp_ipm_arg
 	int cond_pred_corr; // conditional Mehrotra's predictor-corrector
 	int itref_pred_max; // max number of iterative refinement steps for predictor step
 	int itref_corr_max; // max number of iterative refinement steps for corrector step
-	int warm_start; // 0 no warm start, 1 warm start primal sol
-	int lq_fact; // 0 syrk+potrf, 1 mix, 2 lq
+	int warm_start; // 0 no warm start, 1 warm start primal sol, 2 warm start primal and dual sol
+	int square_root_alg; // 0 classical Riccati, 1 square-root Riccati
+	int lq_fact; // 0 syrk+potrf, 1 mix, 2 lq (for square_root_alg==1)
 	int abs_form; // absolute IPM formulation
 	int comp_dual_sol; // dual solution (only for abs_form==1)
 	int comp_res_exit; // compute residuals on exit (only for abs_form==1 and comp_dual_sol==1)
+	int comp_res_pred; // compute residuals of prediction
+	int mode;
 	int memsize;
 	};
 
 
 
-struct d_ocp_qp_ipm_workspace
+struct d_ocp_qp_ipm_ws
 	{
+	double qp_res[4]; // infinity norm of residuals
 	struct d_core_qp_ipm_workspace *core_workspace;
-	struct d_ocp_qp_res_workspace *res_workspace;
+	struct d_ocp_qp_res_ws *res_workspace;
 	struct d_ocp_qp_sol *sol_step;
 	struct d_ocp_qp_sol *sol_itref;
 	struct d_ocp_qp *qp_step;
@@ -94,6 +104,8 @@ struct d_ocp_qp_ipm_workspace
 	struct blasfeo_dvec *Pb; // Pb
 	struct blasfeo_dvec *Zs_inv;
 	struct blasfeo_dmat *L;
+	struct blasfeo_dmat *Ls; // TODO
+	struct blasfeo_dmat *P; // TODO
 	struct blasfeo_dmat *Lh;
 	struct blasfeo_dmat *AL;
 	struct blasfeo_dmat *lq0;
@@ -101,60 +113,81 @@ struct d_ocp_qp_ipm_workspace
 	double *stat; // convergence statistics
 	int *use_hess_fact;
 	void *lq_work0;
-	double qp_res[4]; // infinity norm of residuals
 	int iter; // iteration number
 	int stat_max; // iterations saved in stat
+	int stat_m; // number of recorded stat per IPM iter
 	int use_Pb;
+	int status; // solver status
 	int memsize;
 	};
 
 
 
 //
-int d_sizeof_ocp_qp_ipm_arg();
+int d_ocp_qp_ipm_arg_strseize();
 //
-int d_memsize_ocp_qp_ipm_arg(struct d_ocp_qp_dim *ocp_dim);
+int d_ocp_qp_ipm_arg_memsize(struct d_ocp_qp_dim *ocp_dim);
 //
-void d_create_ocp_qp_ipm_arg(struct d_ocp_qp_dim *ocp_dim, struct d_ocp_qp_ipm_arg *arg, void *mem);
+void d_ocp_qp_ipm_arg_create(struct d_ocp_qp_dim *ocp_dim, struct d_ocp_qp_ipm_arg *arg, void *mem);
 //
-void d_set_default_ocp_qp_ipm_arg(enum hpipm_mode mode, struct d_ocp_qp_ipm_arg *arg);
+void d_ocp_qp_ipm_arg_set_default(enum hpipm_mode mode, struct d_ocp_qp_ipm_arg *arg);
 //
-void d_set_ocp_qp_ipm_arg_iter_max(int iter_max, struct d_ocp_qp_ipm_arg *arg);
-//
-void d_set_ocp_qp_ipm_arg_mu0(double mu0, struct d_ocp_qp_ipm_arg *arg);
-//
-void d_set_ocp_qp_ipm_arg_tol_stat(double tol_stat, struct d_ocp_qp_ipm_arg *arg);
-//
-void d_set_ocp_qp_ipm_arg_tol_eq(double tol_eq, struct d_ocp_qp_ipm_arg *arg);
-//
-void d_set_ocp_qp_ipm_arg_tol_ineq(double tol_ineq, struct d_ocp_qp_ipm_arg *arg);
-//
-void d_set_ocp_qp_ipm_arg_tol_comp(double tol_comp, struct d_ocp_qp_ipm_arg *arg);
-//
-void d_set_ocp_qp_ipm_arg_reg_prim(double tol_comp, struct d_ocp_qp_ipm_arg *arg);
-//
-void d_set_ocp_qp_ipm_arg_warm_start(int warm_start, struct d_ocp_qp_ipm_arg *arg);
+void d_ocp_qp_ipm_arg_set(char *field, void *value, struct d_ocp_qp_ipm_arg *arg);
+// set maximum number of iterations
+void d_ocp_qp_ipm_arg_set_iter_max(int *iter_max, struct d_ocp_qp_ipm_arg *arg);
+// set minimum step lenght
+void d_ocp_qp_ipm_arg_set_alpha_min(double *alpha_min, struct d_ocp_qp_ipm_arg *arg);
+// set initial value of barrier parameter
+void d_ocp_qp_ipm_arg_set_mu0(double *mu0, struct d_ocp_qp_ipm_arg *arg);
+// set exit tolerance on stationarity condition
+void d_ocp_qp_ipm_arg_set_tol_stat(double *tol_stat, struct d_ocp_qp_ipm_arg *arg);
+// set exit tolerance on equality constr
+void d_ocp_qp_ipm_arg_set_tol_eq(double *tol_eq, struct d_ocp_qp_ipm_arg *arg);
+// set exit tolerance on inequality constr
+void d_ocp_qp_ipm_arg_set_tol_ineq(double *tol_ineq, struct d_ocp_qp_ipm_arg *arg);
+// set exit tolerance on complementarity condition
+void d_ocp_qp_ipm_arg_set_tol_comp(double *tol_comp, struct d_ocp_qp_ipm_arg *arg);
+// set regularization of primal variables
+void d_ocp_qp_ipm_arg_set_reg_prim(double *tol_comp, struct d_ocp_qp_ipm_arg *arg);
+// set warm start: 0 no warm start, 1 primal var
+void d_ocp_qp_ipm_arg_set_warm_start(int *warm_start, struct d_ocp_qp_ipm_arg *arg);
+// Mehrotra's predictor-corrector IPM algorithm: 0 no predictor-corrector, 1 use predictor-corrector
+void d_ocp_qp_ipm_arg_set_pred_corr(int *pred_corr, struct d_ocp_qp_ipm_arg *arg);
+// set riccati algorithm: 0 classic, 1 square-root
+void d_ocp_qp_ipm_arg_set_ric_alg(int *alg, struct d_ocp_qp_ipm_arg *arg);
+// compute residuals of prediction
+void d_ocp_qp_ipm_arg_set_comp_res_pred(int *alg, struct d_ocp_qp_ipm_arg *arg);
 
 //
-int d_sizeof_ocp_qp_ipm_workspace();
+int d_ocp_qp_ipm_ws_strsize();
 //
-int d_memsize_ocp_qp_ipm(struct d_ocp_qp_dim *ocp_dim, struct d_ocp_qp_ipm_arg *arg);
+int d_ocp_qp_ipm_ws_memsize(struct d_ocp_qp_dim *ocp_dim, struct d_ocp_qp_ipm_arg *arg);
 //
-void d_create_ocp_qp_ipm(struct d_ocp_qp_dim *ocp_dim, struct d_ocp_qp_ipm_arg *arg, struct d_ocp_qp_ipm_workspace *ws, void *mem);
+void d_ocp_qp_ipm_ws_create(struct d_ocp_qp_dim *ocp_dim, struct d_ocp_qp_ipm_arg *arg, struct d_ocp_qp_ipm_ws *ws, void *mem);
 //
-int d_get_ocp_qp_ipm_iter(struct d_ocp_qp_ipm_workspace *ws);
+void d_ocp_qp_ipm_get(char *field, struct d_ocp_qp_ipm_ws *ws, void *value);
 //
-double d_get_ocp_qp_ipm_res_stat(struct d_ocp_qp_ipm_workspace *ws);
+void d_ocp_qp_ipm_get_status(struct d_ocp_qp_ipm_ws *ws, int *status);
 //
-double d_get_ocp_qp_ipm_res_eq(struct d_ocp_qp_ipm_workspace *ws);
+void d_ocp_qp_ipm_get_iter(struct d_ocp_qp_ipm_ws *ws, int *iter);
 //
-double d_get_ocp_qp_ipm_res_ineq(struct d_ocp_qp_ipm_workspace *ws);
+void d_ocp_qp_ipm_get_max_res_stat(struct d_ocp_qp_ipm_ws *ws, double *res_stat);
 //
-double d_get_ocp_qp_ipm_res_comp(struct d_ocp_qp_ipm_workspace *ws);
+void d_ocp_qp_ipm_get_max_res_eq(struct d_ocp_qp_ipm_ws *ws, double *res_eq);
 //
-double *d_get_ocp_qp_ipm_stat(struct d_ocp_qp_ipm_workspace *ws);
+void d_ocp_qp_ipm_get_max_res_ineq(struct d_ocp_qp_ipm_ws *ws, double *res_ineq);
 //
-int d_solve_ocp_qp_ipm(struct d_ocp_qp *qp, struct d_ocp_qp_sol *qp_sol, struct d_ocp_qp_ipm_arg *arg, struct d_ocp_qp_ipm_workspace *ws);
+void d_ocp_qp_ipm_get_max_res_comp(struct d_ocp_qp_ipm_ws *ws, double *res_comp);
+//
+void d_ocp_qp_ipm_get_stat(struct d_ocp_qp_ipm_ws *ws, double **stat);
+//
+void d_ocp_qp_ipm_get_stat_m(struct d_ocp_qp_ipm_ws *ws, int *stat_m);
+//
+void d_ocp_qp_ipm_solve(struct d_ocp_qp *qp, struct d_ocp_qp_sol *qp_sol, struct d_ocp_qp_ipm_arg *arg, struct d_ocp_qp_ipm_ws *ws);
+//
+void d_ocp_qp_ipm_predict(struct d_ocp_qp *qp, struct d_ocp_qp_sol *qp_sol, struct d_ocp_qp_ipm_arg *arg, struct d_ocp_qp_ipm_ws *ws);
+//
+void d_ocp_qp_ipm_sens(struct d_ocp_qp *qp, struct d_ocp_qp_sol *qp_sol, struct d_ocp_qp_ipm_arg *arg, struct d_ocp_qp_ipm_ws *ws);
 
 
 

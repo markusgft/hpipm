@@ -3,25 +3,31 @@
 * This file is part of HPIPM.                                                                     *
 *                                                                                                 *
 * HPIPM -- High-Performance Interior Point Method.                                                *
-* Copyright (C) 2017-2018 by Gianluca Frison.                                                     *
+* Copyright (C) 2019 by Gianluca Frison.                                                          *
 * Developed at IMTEK (University of Freiburg) under the supervision of Moritz Diehl.              *
 * All rights reserved.                                                                            *
 *                                                                                                 *
-* This program is free software: you can redistribute it and/or modify                            *
-* it under the terms of the GNU General Public License as published by                            *
-* the Free Software Foundation, either version 3 of the License, or                               *
-* (at your option) any later version                                                              *.
+* The 2-Clause BSD License                                                                        *
 *                                                                                                 *
-* This program is distributed in the hope that it will be useful,                                 *
-* but WITHOUT ANY WARRANTY; without even the implied warranty of                                  *
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                                   *
-* GNU General Public License for more details.                                                    *
+* Redistribution and use in source and binary forms, with or without                              *
+* modification, are permitted provided that the following conditions are met:                     *
 *                                                                                                 *
-* You should have received a copy of the GNU General Public License                               *
-* along with this program.  If not, see <https://www.gnu.org/licenses/>.                          *
+* 1. Redistributions of source code must retain the above copyright notice, this                  *
+*    list of conditions and the following disclaimer.                                             *
+* 2. Redistributions in binary form must reproduce the above copyright notice,                    *
+*    this list of conditions and the following disclaimer in the documentation                    *
+*    and/or other materials provided with the distribution.                                       *
 *                                                                                                 *
-* The authors designate this particular file as subject to the "Classpath" exception              *
-* as provided by the authors in the LICENSE file that accompained this code.                      *
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND                 *
+* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED                   *
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE                          *
+* DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR                 *
+* ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES                  *
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;                    *
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND                     *
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT                      *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS                   *
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                                    *
 *                                                                                                 *
 * Author: Gianluca Frison, gianluca.frison (at) imtek.uni-freiburg.de                             *
 *                                                                                                 *
@@ -29,7 +35,7 @@
 
 
 
-int MEMSIZE_DENSE_QP(struct DENSE_QP_DIM *dim)
+int DENSE_QP_MEMSIZE(struct DENSE_QP_DIM *dim)
 	{
 
 	int nv = dim->nv;
@@ -63,8 +69,12 @@ int MEMSIZE_DENSE_QP(struct DENSE_QP_DIM *dim)
 
 
 
-void CREATE_DENSE_QP(struct DENSE_QP_DIM *dim, struct DENSE_QP *qp, void *mem)
+void DENSE_QP_CREATE(struct DENSE_QP_DIM *dim, struct DENSE_QP *qp, void *mem)
 	{
+
+	// TODO set memory to zero !!!!!!!
+
+	int ii;
 
 	int nv = dim->nv;
 	int ne = dim->ne;
@@ -154,7 +164,7 @@ void CREATE_DENSE_QP(struct DENSE_QP_DIM *dim, struct DENSE_QP *qp, void *mem)
 
 	qp->dim = dim;
 
-	qp->memsize = MEMSIZE_DENSE_QP(dim);
+	qp->memsize = DENSE_QP_MEMSIZE(dim);
 
 
 #if defined(RUNTIME_CHECKS)
@@ -172,10 +182,10 @@ void CREATE_DENSE_QP(struct DENSE_QP_DIM *dim, struct DENSE_QP *qp, void *mem)
 
 
 
-void CVT_COLMAJ_TO_DENSE_QP(REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL *d_lb, REAL *d_ub, REAL *C, REAL *d_lg, REAL *d_ug, REAL *Zl, REAL *Zu, REAL *zl, REAL *zu, int *idxs, REAL *d_ls, REAL *d_us, struct DENSE_QP *qp)
+void DENSE_QP_SET_ALL(REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL *d_lb, REAL *d_ub, REAL *C, REAL *d_lg, REAL *d_ug, REAL *Zl, REAL *Zu, REAL *zl, REAL *zu, int *idxs, REAL *d_ls, REAL *d_us, struct DENSE_QP *qp)
 	{
 
-	int ii;
+	int ii, jj;
 
 	int nv = qp->dim->nv;
 	int ne = qp->dim->ne;
@@ -227,7 +237,7 @@ void CVT_COLMAJ_TO_DENSE_QP(REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL 
 
 
 
-void CVT_DENSE_QP_TO_COLMAJ(struct DENSE_QP *qp, REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL *d_lb, REAL *d_ub, REAL *C, REAL *d_lg, REAL *d_ug, REAL *Zl, REAL *Zu, REAL *zl, REAL *zu, int *idxs, REAL *d_ls, REAL *d_us)
+void DENSE_QP_GET_ALL(struct DENSE_QP *qp, REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL *d_lb, REAL *d_ub, REAL *C, REAL *d_lg, REAL *d_ug, REAL *Zl, REAL *Zu, REAL *zl, REAL *zu, int *idxs, REAL *d_ls, REAL *d_us)
 	{
 
 	int ii;
@@ -255,110 +265,6 @@ void CVT_DENSE_QP_TO_COLMAJ(struct DENSE_QP *qp, REAL *H, REAL *g, REAL *A, REAL
 	if(ng>0)
 		{
 		CVT_TRAN_STRMAT2MAT(nv, ng, qp->Ct, 0, 0, C, ng);
-		CVT_STRVEC2VEC(ng, qp->d, nb, d_lg);
-		CVT_STRVEC2VEC(ng, qp->d, 2*nb+ng, d_ug);
-		for(ii=0; ii<ng; ii++) d_ug[ii] = - d_ug[ii];
-		}
-	if(ns>0)
-		{
-		for(ii=0; ii<ns; ii++) idxs[ii] = qp->idxs[ii];
-		CVT_STRVEC2VEC(ns, qp->Z, 0, Zl);
-		CVT_STRVEC2VEC(ns, qp->Z, ns, Zu);
-		CVT_STRVEC2VEC(ns, qp->gz, nv, zl);
-		CVT_STRVEC2VEC(ns, qp->gz, nv+ns, zu);
-		CVT_STRVEC2VEC(ns, qp->d, 2*nb+2*ng, d_ls);
-		CVT_STRVEC2VEC(ns, qp->d, 2*nb+2*ng+ns, d_us);
-		}
-
-	return;
-
-	}
-
-
-
-void CVT_ROWMAJ_TO_DENSE_QP(REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL *d_lb, REAL *d_ub, REAL *C, REAL *d_lg, REAL *d_ug, REAL *Zl, REAL *Zu, REAL *zl, REAL *zu, int *idxs, REAL *d_ls, REAL *d_us, struct DENSE_QP *qp)
-	{
-
-	int ii;
-
-	int nv = qp->dim->nv;
-	int ne = qp->dim->ne;
-	int nb = qp->dim->nb;
-	int ng = qp->dim->ng;
-	int ns = qp->dim->ns;
-
-	CVT_TRAN_MAT2STRMAT(nv, nv, H, nv, qp->Hv, 0, 0);
-	CVT_VEC2STRVEC(nv, g, qp->gz, 0);
-	if(ne>0)
-		{
-		CVT_TRAN_MAT2STRMAT(nv, ne, A, nv, qp->A, 0, 0);
-		CVT_VEC2STRVEC(ne, b, qp->b, 0);
-		}
-	if(nb>0)
-		{
-		for(ii=0; ii<nb; ii++) qp->idxb[ii] = idxb[ii];
-		CVT_VEC2STRVEC(nb, d_lb, qp->d, 0);
-		CVT_VEC2STRVEC(nb, d_ub, qp->d, nb+ng);
-		VECSC_LIBSTR(nb, -1.0, qp->d, nb+ng);
-		VECSE_LIBSTR(nb, 0.0, qp->m, 0);
-		VECSE_LIBSTR(nb, 0.0, qp->m, nb+ng);
-		}
-	if(ng>0)
-		{
-		CVT_MAT2STRMAT(nv, ng, C, nv, qp->Ct, 0, 0);
-		CVT_VEC2STRVEC(ng, d_lg, qp->d, nb);
-		CVT_VEC2STRVEC(ng, d_ug, qp->d, 2*nb+ng);
-		VECSC_LIBSTR(ng, -1.0, qp->d, 2*nb+ng);
-		VECSE_LIBSTR(ng, 0.0, qp->m, nb);
-		VECSE_LIBSTR(ng, 0.0, qp->m, 2*nb+ng);
-		}
-	if(ns>0)
-		{
-		for(ii=0; ii<ns; ii++) qp->idxs[ii] = idxs[ii];
-		CVT_VEC2STRVEC(ns, Zl, qp->Z, 0);
-		CVT_VEC2STRVEC(ns, Zu, qp->Z, ns);
-		CVT_VEC2STRVEC(ns, zl, qp->gz, nv);
-		CVT_VEC2STRVEC(ns, zu, qp->gz, nv+ns);
-		CVT_VEC2STRVEC(ns, d_ls, qp->d, 2*nb+2*ng);
-		CVT_VEC2STRVEC(ns, d_us, qp->d, 2*nb+2*ng+ns);
-		VECSE_LIBSTR(ns, 0.0, qp->m, 2*nb+2*ng);
-		VECSE_LIBSTR(ns, 0.0, qp->m, 2*nb+2*ng+ns);
-		}
-
-	return;
-
-	}
-
-
-
-void CVT_DENSE_QP_TO_ROWMAJ(struct DENSE_QP *qp, REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL *d_lb, REAL *d_ub, REAL *C, REAL *d_lg, REAL *d_ug, REAL *Zl, REAL *Zu, REAL *zl, REAL *zu, int *idxs, REAL *d_ls, REAL *d_us)
-	{
-
-	int ii;
-
-	int nv = qp->dim->nv;
-	int ne = qp->dim->ne;
-	int nb = qp->dim->nb;
-	int ng = qp->dim->ng;
-	int ns = qp->dim->ns;
-
-	CVT_TRAN_STRMAT2MAT(nv, nv, qp->Hv, 0, 0, H, nv);
-	CVT_STRVEC2VEC(nv, qp->gz, 0, g);
-	if(ne>0)
-		{
-		CVT_TRAN_STRMAT2MAT(ne, nv, qp->A, 0, 0, A, nv);
-		CVT_STRVEC2VEC(ne, qp->b, 0, b);
-		}
-	if(nb>0)
-		{
-		for(ii=0; ii<nb; ii++) idxb[ii] = qp->idxb[ii];
-		CVT_STRVEC2VEC(nb, qp->d, 0, d_lb);
-		CVT_STRVEC2VEC(nb, qp->d, nb+ng, d_ub);
-		for(ii=0; ii<nb; ii++) d_ub[ii] = - d_ub[ii];
-		}
-	if(ng>0)
-		{
-		CVT_STRMAT2MAT(nv, ng, qp->Ct, 0, 0, C, nv);
 		CVT_STRVEC2VEC(ng, qp->d, nb, d_lg);
 		CVT_STRVEC2VEC(ng, qp->d, 2*nb+ng, d_ug);
 		for(ii=0; ii<ng; ii++) d_ug[ii] = - d_ug[ii];
@@ -857,3 +763,108 @@ void DENSE_QP_GET_US(struct DENSE_QP *qp, REAL *us)
 	return;
 
 	}
+
+
+
+void DENSE_QP_SET_ALL_ROWMAJ(REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL *d_lb, REAL *d_ub, REAL *C, REAL *d_lg, REAL *d_ug, REAL *Zl, REAL *Zu, REAL *zl, REAL *zu, int *idxs, REAL *d_ls, REAL *d_us, struct DENSE_QP *qp)
+	{
+
+	int ii;
+
+	int nv = qp->dim->nv;
+	int ne = qp->dim->ne;
+	int nb = qp->dim->nb;
+	int ng = qp->dim->ng;
+	int ns = qp->dim->ns;
+
+	CVT_TRAN_MAT2STRMAT(nv, nv, H, nv, qp->Hv, 0, 0);
+	CVT_VEC2STRVEC(nv, g, qp->gz, 0);
+	if(ne>0)
+		{
+		CVT_TRAN_MAT2STRMAT(nv, ne, A, nv, qp->A, 0, 0);
+		CVT_VEC2STRVEC(ne, b, qp->b, 0);
+		}
+	if(nb>0)
+		{
+		for(ii=0; ii<nb; ii++) qp->idxb[ii] = idxb[ii];
+		CVT_VEC2STRVEC(nb, d_lb, qp->d, 0);
+		CVT_VEC2STRVEC(nb, d_ub, qp->d, nb+ng);
+		VECSC_LIBSTR(nb, -1.0, qp->d, nb+ng);
+		VECSE_LIBSTR(nb, 0.0, qp->m, 0);
+		VECSE_LIBSTR(nb, 0.0, qp->m, nb+ng);
+		}
+	if(ng>0)
+		{
+		CVT_MAT2STRMAT(nv, ng, C, nv, qp->Ct, 0, 0);
+		CVT_VEC2STRVEC(ng, d_lg, qp->d, nb);
+		CVT_VEC2STRVEC(ng, d_ug, qp->d, 2*nb+ng);
+		VECSC_LIBSTR(ng, -1.0, qp->d, 2*nb+ng);
+		VECSE_LIBSTR(ng, 0.0, qp->m, nb);
+		VECSE_LIBSTR(ng, 0.0, qp->m, 2*nb+ng);
+		}
+	if(ns>0)
+		{
+		for(ii=0; ii<ns; ii++) qp->idxs[ii] = idxs[ii];
+		CVT_VEC2STRVEC(ns, Zl, qp->Z, 0);
+		CVT_VEC2STRVEC(ns, Zu, qp->Z, ns);
+		CVT_VEC2STRVEC(ns, zl, qp->gz, nv);
+		CVT_VEC2STRVEC(ns, zu, qp->gz, nv+ns);
+		CVT_VEC2STRVEC(ns, d_ls, qp->d, 2*nb+2*ng);
+		CVT_VEC2STRVEC(ns, d_us, qp->d, 2*nb+2*ng+ns);
+		VECSE_LIBSTR(ns, 0.0, qp->m, 2*nb+2*ng);
+		VECSE_LIBSTR(ns, 0.0, qp->m, 2*nb+2*ng+ns);
+		}
+
+	return;
+
+	}
+
+
+
+void DENSE_QP_GET_ALL_ROWMAJ(struct DENSE_QP *qp, REAL *H, REAL *g, REAL *A, REAL *b, int *idxb, REAL *d_lb, REAL *d_ub, REAL *C, REAL *d_lg, REAL *d_ug, REAL *Zl, REAL *Zu, REAL *zl, REAL *zu, int *idxs, REAL *d_ls, REAL *d_us)
+	{
+
+	int ii;
+
+	int nv = qp->dim->nv;
+	int ne = qp->dim->ne;
+	int nb = qp->dim->nb;
+	int ng = qp->dim->ng;
+	int ns = qp->dim->ns;
+
+	CVT_TRAN_STRMAT2MAT(nv, nv, qp->Hv, 0, 0, H, nv);
+	CVT_STRVEC2VEC(nv, qp->gz, 0, g);
+	if(ne>0)
+		{
+		CVT_TRAN_STRMAT2MAT(ne, nv, qp->A, 0, 0, A, nv);
+		CVT_STRVEC2VEC(ne, qp->b, 0, b);
+		}
+	if(nb>0)
+		{
+		for(ii=0; ii<nb; ii++) idxb[ii] = qp->idxb[ii];
+		CVT_STRVEC2VEC(nb, qp->d, 0, d_lb);
+		CVT_STRVEC2VEC(nb, qp->d, nb+ng, d_ub);
+		for(ii=0; ii<nb; ii++) d_ub[ii] = - d_ub[ii];
+		}
+	if(ng>0)
+		{
+		CVT_STRMAT2MAT(nv, ng, qp->Ct, 0, 0, C, nv);
+		CVT_STRVEC2VEC(ng, qp->d, nb, d_lg);
+		CVT_STRVEC2VEC(ng, qp->d, 2*nb+ng, d_ug);
+		for(ii=0; ii<ng; ii++) d_ug[ii] = - d_ug[ii];
+		}
+	if(ns>0)
+		{
+		for(ii=0; ii<ns; ii++) idxs[ii] = qp->idxs[ii];
+		CVT_STRVEC2VEC(ns, qp->Z, 0, Zl);
+		CVT_STRVEC2VEC(ns, qp->Z, ns, Zu);
+		CVT_STRVEC2VEC(ns, qp->gz, nv, zl);
+		CVT_STRVEC2VEC(ns, qp->gz, nv+ns, zu);
+		CVT_STRVEC2VEC(ns, qp->d, 2*nb+2*ng, d_ls);
+		CVT_STRVEC2VEC(ns, qp->d, 2*nb+2*ng+ns, d_us);
+		}
+
+	return;
+
+	}
+
