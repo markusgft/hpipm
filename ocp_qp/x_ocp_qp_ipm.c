@@ -447,6 +447,10 @@ int OCP_QP_IPM_WS_MEMSIZE(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg)
 		size += 1*(N+1)*sizeof(struct STRMAT); // P
 		size += 1*sizeof(struct STRMAT); // Ls
 		}
+	else
+		{
+		size += 2*sizeof(struct STRMAT); // P
+		}
 	if(arg->lq_fact>0)
 		{
 		size += 1*(N+1)*sizeof(struct STRMAT); // Lh
@@ -468,6 +472,10 @@ int OCP_QP_IPM_WS_MEMSIZE(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg)
 		{
 		for(ii=0; ii<=N; ii++) size += 1*SIZE_STRMAT(nx[ii]+1, nx[ii]); // P
 		size += 1*SIZE_STRMAT(nxM+1, nuM); // Ls
+		}
+	else
+		{
+		size += 2*SIZE_STRMAT(nxM, nxM); // P
 		}
 	if(arg->lq_fact>0)
 		{
@@ -622,6 +630,11 @@ void OCP_QP_IPM_WS_CREATE(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, st
 		workspace->Ls = sm_ptr;
 		sm_ptr += 1;
 		}
+	else
+		{
+		workspace->P = sm_ptr;
+		sm_ptr += 2;
+		}
 	if(arg->lq_fact>0)
 		{
 		workspace->Lh = sm_ptr;
@@ -718,6 +731,13 @@ void OCP_QP_IPM_WS_CREATE(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, st
 			}
 		CREATE_STRMAT(nxM+1, nuM, workspace->Ls, c_ptr);
 		c_ptr += (workspace->Ls)->memsize;
+		}
+	else
+		{
+		CREATE_STRMAT(nxM, nxM, workspace->P+0, c_ptr);
+		c_ptr += (workspace->P+0)->memsize;
+		CREATE_STRMAT(nxM, nxM, workspace->P+1, c_ptr);
+		c_ptr += (workspace->P+1)->memsize;
 		}
 
 	if(arg->lq_fact>0)
@@ -905,6 +925,11 @@ void OCP_QP_IPM_WS_CREATE(struct OCP_QP_DIM *dim, struct OCP_QP_IPM_ARG *arg, st
 	
 	workspace->use_Pb = 0;
 
+	// cache stuff
+	workspace->dim = dim;
+	workspace->square_root_alg = arg->square_root_alg;
+	workspace->lq_fact = arg->lq_fact;
+
 	workspace->memsize = memsize; //OCP_QP_IPM_WS_MEMSIZE(dim, arg);
 
 
@@ -1024,6 +1049,91 @@ void OCP_QP_IPM_GET_STAT(struct OCP_QP_IPM_WS *ws, REAL **stat)
 void OCP_QP_IPM_GET_STAT_M(struct OCP_QP_IPM_WS *ws, int *stat_m)
 	{
 	*stat_m = ws->stat_m;
+	}
+
+
+
+void OCP_QP_IPM_GET_RIC_LR(int stage, struct OCP_QP_IPM_WS *ws, REAL *Lr)
+	{
+	int *nu = ws->dim->nu;
+
+	int nu0 = nu[stage];
+
+	UNPACK_MAT(nu0, nu0, ws->L+stage, 0, 0, Lr, nu0);
+	}
+
+
+
+void OCP_QP_IPM_GET_RIC_LS(int stage, struct OCP_QP_IPM_WS *ws, REAL *Ls)
+	{
+	int *nu = ws->dim->nu;
+	int *nx = ws->dim->nx;
+
+	int nu0 = nu[stage];
+	int nx0 = nx[stage];
+
+	UNPACK_MAT(nx0, nu0, ws->L+stage, nu0, 0, Ls, nx0);
+	}
+
+
+
+void OCP_QP_IPM_GET_RIC_P(int stage, struct OCP_QP_IPM_WS *ws, REAL *P)
+	{
+	int *nu = ws->dim->nu;
+	int *nx = ws->dim->nx;
+
+	int nu0 = nu[stage];
+	int nx0 = nx[stage];
+
+	if(ws->square_root_alg)
+		{
+		GESE(nx0, nx0, 0.0, ws->P+0, 0, 0);
+		TRCP_L(nx0, ws->L+stage, nu0, nu0, ws->P+0, 0, 0);
+		SYRK_LN(nx0, nx0, 1.0, ws->P+0, 0, 0, ws->P+0, 0, 0, 0.0, ws->P+1, 0, 0, ws->P+1, 0, 0); // TODO lauum
+		TRTR_L(nx0, ws->P+1, 0, 0, ws->P+1, 0, 0);
+		UNPACK_MAT(nx0, nx0, ws->P+1, 0, 0, P, nx0);
+		}
+	else
+		{
+		UNPACK_MAT(nx0, nx0, ws->P+stage, 0, 0, P, nx0);
+		}
+	}
+
+
+
+// XXX valid only in the unconstrained case !!!
+void OCP_QP_IPM_GET_RIC_LR_VEC(int stage, struct OCP_QP_IPM_WS *ws, REAL *lr)
+	{
+	int *nu = ws->dim->nu;
+	int *nx = ws->dim->nx;
+
+	int nu0 = nu[stage];
+	int nx0 = nx[stage];
+
+	UNPACK_MAT(1, nu0, ws->L+stage, nu0+nx0, 0, lr, 1);
+	}
+
+
+
+// XXX valid only in the unconstrained case !!!
+void OCP_QP_IPM_GET_RIC_P_VEC(int stage, struct OCP_QP_IPM_WS *ws, REAL *p)
+	{
+	int *nu = ws->dim->nu;
+	int *nx = ws->dim->nx;
+
+	int nu0 = nu[stage];
+	int nx0 = nx[stage];
+
+	if(ws->square_root_alg)
+		{
+		ROWEX(nx0, 1.0, ws->L+stage, nu0+nx0, nu0, ws->tmp_nxM, 0);
+		TRMV_LNN(nx0, nx0, ws->L+stage, nu0, nu0, ws->tmp_nxM, 0, ws->tmp_nxM, 0);
+		UNPACK_VEC(nx0, ws->tmp_nxM, 0, p);
+		}
+	else
+		{
+		UNPACK_MAT(1, nx0, ws->P+stage, nx0, 0, p, 1);
+		}
 	}
 
 
@@ -1315,14 +1425,14 @@ void OCP_QP_IPM_SOLVE(struct OCP_QP *qp, struct OCP_QP_SOL *qp_sol, struct OCP_Q
 		{
 
 		// fact and solve kkt
-		if(arg->lq_fact==0)
+		if(ws->lq_fact==0)
 			{
 
 			// syrk+cholesky
 			FACT_SOLVE_KKT_STEP_OCP_QP(ws->qp_step, ws->sol_step, arg, ws);
 
 			}
-		else if(arg->lq_fact==1 & force_lq==0)
+		else if(ws->lq_fact==1 & force_lq==0)
 			{
 
 			// syrk+chol, switch to lq when needed
@@ -1373,7 +1483,7 @@ blasfeo_print_tran_dvec(cws->nc, ws->sol_step->t, 0);
 				}
 
 			}
-		else // arg->lq_fact==2
+		else // ws->lq_fact==2
 			{
 
 			FACT_LQ_SOLVE_KKT_STEP_OCP_QP(ws->qp_step, ws->sol_step, arg, ws);

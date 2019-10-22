@@ -89,6 +89,7 @@ struct d_ocp_qp_ipm_ws
 	{
 	double qp_res[4]; // infinity norm of residuals
 	struct d_core_qp_ipm_workspace *core_workspace;
+	struct d_ocp_qp_dim *dim; // cache dim
 	struct d_ocp_qp_res_ws *res_workspace;
 	struct d_ocp_qp_sol *sol_step;
 	struct d_ocp_qp_sol *sol_itref;
@@ -104,8 +105,8 @@ struct d_ocp_qp_ipm_ws
 	struct blasfeo_dvec *Pb; // Pb
 	struct blasfeo_dvec *Zs_inv;
 	struct blasfeo_dmat *L;
-	struct blasfeo_dmat *Ls; // TODO
-	struct blasfeo_dmat *P; // TODO
+	struct blasfeo_dmat *Ls;
+	struct blasfeo_dmat *P;
 	struct blasfeo_dmat *Lh;
 	struct blasfeo_dmat *AL;
 	struct blasfeo_dmat *lq0;
@@ -118,6 +119,8 @@ struct d_ocp_qp_ipm_ws
 	int stat_m; // number of recorded stat per IPM iter
 	int use_Pb;
 	int status; // solver status
+	int square_root_alg; // cache from arg
+	int lq_fact; // cache from arg
 	int memsize;
 	};
 
@@ -182,6 +185,16 @@ void d_ocp_qp_ipm_get_max_res_comp(struct d_ocp_qp_ipm_ws *ws, double *res_comp)
 void d_ocp_qp_ipm_get_stat(struct d_ocp_qp_ipm_ws *ws, double **stat);
 //
 void d_ocp_qp_ipm_get_stat_m(struct d_ocp_qp_ipm_ws *ws, int *stat_m);
+//
+void d_ocp_qp_ipm_get_ric_Lr(int stage, struct d_ocp_qp_ipm_ws *ws, double *Lr);
+//
+void d_ocp_qp_ipm_get_ric_Ls(int stage, struct d_ocp_qp_ipm_ws *ws, double *Ls);
+//
+void d_ocp_qp_ipm_get_ric_P(int stage, struct d_ocp_qp_ipm_ws *ws, double *P);
+// valid only in the unconstrained case
+void d_ocp_qp_ipm_get_ric_lr(int stage, struct d_ocp_qp_ipm_ws *ws, double *lr);
+// valid only in the unconstrained case
+void d_ocp_qp_ipm_get_ric_p(int stage, struct d_ocp_qp_ipm_ws *ws, double *p);
 //
 void d_ocp_qp_ipm_solve(struct d_ocp_qp *qp, struct d_ocp_qp_sol *qp_sol, struct d_ocp_qp_ipm_arg *arg, struct d_ocp_qp_ipm_ws *ws);
 //

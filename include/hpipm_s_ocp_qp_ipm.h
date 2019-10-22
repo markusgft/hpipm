@@ -91,6 +91,7 @@ struct s_ocp_qp_ipm_ws
 	{
 	struct s_core_qp_ipm_workspace *core_workspace;
 	struct s_ocp_qp_res_ws *res_workspace;
+	struct s_ocp_qp_dim *dim; // cache dim
 	struct s_ocp_qp_sol *sol_step;
 	struct s_ocp_qp_sol *sol_itref;
 	struct s_ocp_qp *qp_step;
@@ -105,8 +106,8 @@ struct s_ocp_qp_ipm_ws
 	struct blasfeo_svec *Pb; // Pb
 	struct blasfeo_svec *Zs_inv;
 	struct blasfeo_smat *L;
-	struct blasfeo_smat *Ls; // TODO
-	struct blasfeo_smat *P; // TODO
+	struct blasfeo_smat *Ls;
+	struct blasfeo_smat *P;
 	struct blasfeo_smat *Lh;
 	struct blasfeo_smat *AL;
 	struct blasfeo_smat *lq0;
@@ -120,6 +121,8 @@ struct s_ocp_qp_ipm_ws
 	int stat_m; // number of recorded stat per IPM iter
 	int use_Pb;
 	int status; // solver status
+	int square_root_alg; // cache from arg
+	int lq_fact; // cache from arg
 	int memsize;
 	};
 
@@ -184,6 +187,16 @@ void s_ocp_qp_ipm_get_max_res_comp(struct s_ocp_qp_ipm_ws *ws, float *res_comp);
 void s_ocp_qp_ipm_get_stat(struct s_ocp_qp_ipm_ws *ws, float **stat);
 //
 void s_ocp_qp_ipm_get_stat_m(struct s_ocp_qp_ipm_ws *ws, int *stat_m);
+//
+void s_ocp_qp_ipm_get_ric_Lr(int stage, struct s_ocp_qp_ipm_ws *ws, float *Lr);
+//
+void s_ocp_qp_ipm_get_ric_Ls(int stage, struct s_ocp_qp_ipm_ws *ws, float *Ls);
+//
+void s_ocp_qp_ipm_get_ric_P(int stage, struct s_ocp_qp_ipm_ws *ws, float *P);
+// valid only in the unconstrained case
+void s_ocp_qp_ipm_get_ric_lr(int stage, struct s_ocp_qp_ipm_ws *ws, float *lr);
+// valid only in the unconstrained case
+void s_ocp_qp_ipm_get_ric_p(int stage, struct s_ocp_qp_ipm_ws *ws, float *p);
 //
 void s_ocp_qp_ipm_solve(struct s_ocp_qp *qp, struct s_ocp_qp_sol *qp_sol, struct s_ocp_qp_ipm_arg *arg, struct s_ocp_qp_ipm_ws *ws);
 //
